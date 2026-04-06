@@ -1,0 +1,4 @@
+TimeCreated,EventID,Level,Provider,Channel,Computer,UserSID,Message,EventRecordID,ProcessId,ThreadId
+2024-01-15T10:30:00+00:00,4688,0,Microsoft-Windows-Security-Auditing,Security,WORKSTATION1,S-1-5-21-123456-789012-345678-1001,A new process has been created,98765,4,1234
+2024-01-15T10:30:05+00:00,1,4,Microsoft-Windows-Sysmon,Microsoft-Windows-Sysmon/Operational,WORKSTATION1,S-1-5-18,Process Create: evil.exe,98766,4,1235
+2024-01-15T10:35:00+00:00,1102,0,Microsoft-Windows-Eventlog,Security,WORKSTATION1,S-1-5-21-123456-789012-345678-500,The audit log was cleared,98767,856,2344

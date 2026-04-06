@@ -1,0 +1,63 @@
+[
+    {
+        "@id": "kb:lnk-entry--{ENTRY_UUID}",
+        "@type": "observable:File",
+        "core:hasFacet": [
+            {
+                "@id": "kb:lnk-entry-file-facet--{ENTRY_UUID}",
+                "@type": "observable:FileFacet",
+                "observable:fileName": "",
+                "observable:filePath": "",
+                "observable:extension": ".lnk",
+                "observable:isDirectory": false,
+                "observable:sizeInBytes": {
+                    "@type": "xsd:integer",
+                    "@value": 0
+                },
+                "observable:accessedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": ""
+                },
+                "observable:observableCreatedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": ""
+                },
+                "observable:modifiedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": ""
+                }
+            },
+            {
+                "@id": "kb:lnk-entry-lnk-facet--{ENTRY_UUID}",
+                "@type": "ioi-ext:LnkFacet",
+                "ioi-ext:targetFilePath": "",
+                "ioi-ext:targetFileName": "",
+                "ioi-ext:targetCreatedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": ""
+                },
+                "ioi-ext:targetModifiedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": ""
+                },
+                "ioi-ext:targetAccessedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": ""
+                },
+                "ioi-ext:relativePath": "",
+                "ioi-ext:workingDirectory": "",
+                "ioi-ext:arguments": "",
+                "ioi-ext:targetMftEntryNumber": {
+                    "@type": "xsd:integer",
+                    "@value": 0
+                },
+                "ioi-ext:targetMftSequenceNumber": {
+                    "@type": "xsd:integer",
+                    "@value": 0
+                },
+                "ioi-ext:machineId": "",
+                "ioi-ext:machineMacAddress": ""
+            }
+        ]
+    }
+]

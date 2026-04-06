@@ -1,0 +1,62 @@
+[
+  {
+    "@id": "kb:evtx-entry--{ENTRY_UUID}",
+    "@type": "observable:EventRecord",
+    "core:hasFacet": [
+      {
+        "@id": "kb:evtx-entry-standard-facet--{ENTRY_UUID}",
+        "@type": [
+          "observable:EventRecordFacet",
+          "core:Facet"
+        ],
+        "observable:eventID": "{EVENT_ID}",
+        "observable:eventRecordID": "{EVENT_RECORD_ID}",
+        "observable:eventRecordText": "{EVENT_DESCRIPTION}",
+        "observable:eventRecordRaw": "{PAYLOAD}",
+        "observable:eventRecordServiceName": "{PROVIDER}",
+        "observable:eventType": "{LEVEL}",
+        "observable:startTime": {
+          "@type": "xsd:dateTime",
+          "@value": "{TIME_CREATED}"
+        },
+        "observable:eventRecordDevice": {
+          "@id": "kb:device--{COMPUTER_UUID}",
+          "@type": "observable:Device",
+          "core:name": "{COMPUTER}"
+        }
+      },
+      {
+        "@id": "kb:evtx-entry-custom-facet--{ENTRY_UUID}",
+        "@type": [
+          "ioi-ext:EventLogFacet",
+          "core:Facet"
+        ],
+        "ioi-ext:channel": "{CHANNEL}",
+        "ioi-ext:keywords": "{KEYWORDS}",
+        "ioi-ext:processId": {
+          "@type": "xsd:integer",
+          "@value": "{PROCESS_ID}"
+        },
+        "ioi-ext:threadId": {
+          "@type": "xsd:integer",
+          "@value": "{THREAD_ID}"
+        },
+        "ioi-ext:chunkNumber": {
+          "@type": "xsd:integer",
+          "@value": "{CHUNK_NUMBER}"
+        },
+        "ioi-ext:extraDataOffset": {
+          "@type": "xsd:integer",
+          "@value": "{EXTRA_DATA_OFFSET}"
+        },
+        "ioi-ext:hiddenRecord": {
+          "@type": "xsd:boolean",
+          "@value": "{HIDDEN_RECORD}"
+        },
+        "ioi-ext:sourceFile": "{SOURCE_FILE}",
+        "ioi-ext:payloadData1": "{PAYLOAD_DATA1}",
+        "ioi-ext:payloadData2": "{PAYLOAD_DATA2}"
+      }
+    ]
+  }
+]

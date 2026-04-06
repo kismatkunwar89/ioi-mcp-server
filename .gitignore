@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+output/
+.venv/
+*.jsonld
+!src/ioi_mcp/data/templates/*.json

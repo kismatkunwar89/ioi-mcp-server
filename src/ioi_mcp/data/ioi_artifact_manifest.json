@@ -1,0 +1,435 @@
+{
+  "Prefetch": {
+    "uco_class": "uco-observable:WindowsPrefetch",
+    "uco_facets": [
+      "WindowsPrefetchFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "official"
+  },
+  "WindowsRegistryKey": {
+    "uco_class": "uco-observable:WindowsRegistryKey",
+    "uco_facets": [
+      "WindowsRegistryKeyFacet"
+    ],
+    "tier": "official"
+  },
+  "WindowsRegistryHive": {
+    "uco_class": "uco-observable:WindowsRegistryHive",
+    "uco_facets": [
+      "WindowsRegistryHiveFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "official"
+  },
+  "EVTX": {
+    "uco_class": "uco-observable:EventRecord",
+    "uco_facets": [
+      "EventRecordFacet"
+    ],
+    "tier": "official"
+  },
+  "EVT": {
+    "uco_class": "uco-observable:EventLog",
+    "uco_facets": [
+      "EventRecordFacet",
+      "FileFacet"
+    ],
+    "tier": "official"
+  },
+  "EmailMessage": {
+    "uco_class": "uco-observable:EmailMessage",
+    "uco_facets": [
+      "EmailMessageFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "official"
+  },
+  "PE_Executable": {
+    "uco_class": "uco-observable:WindowsPEBinaryFile",
+    "uco_facets": [
+      "WindowsPEBinaryFileFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "official"
+  },
+  "PDF": {
+    "uco_class": "uco-observable:PDFFile",
+    "uco_facets": [
+      "PDFFileFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "official"
+  },
+  "NetworkConnection": {
+    "uco_class": "uco-observable:NetworkConnection",
+    "uco_facets": [
+      "NetworkConnectionFacet"
+    ],
+    "tier": "official"
+  },
+  "TCPConnection": {
+    "uco_class": "uco-observable:TCPConnection",
+    "uco_facets": [
+      "TCPConnectionFacet",
+      "NetworkConnectionFacet"
+    ],
+    "tier": "official"
+  },
+  "URLHistory": {
+    "uco_class": "uco-observable:URLHistory",
+    "uco_facets": [
+      "URLHistoryFacet"
+    ],
+    "tier": "official"
+  },
+  "URL": {
+    "uco_class": "uco-observable:URL",
+    "uco_facets": [
+      "URLFacet"
+    ],
+    "tier": "official"
+  },
+  "SQLite": {
+    "uco_class": "uco-observable:SQLiteBlob",
+    "uco_facets": [
+      "SQLiteBlobFacet"
+    ],
+    "tier": "official"
+  },
+  "WindowsTask": {
+    "uco_class": "uco-observable:WindowsTask",
+    "uco_facets": [
+      "WindowsTaskFacet"
+    ],
+    "tier": "official"
+  },
+  "WindowsService": {
+    "uco_class": "uco-observable:WindowsService",
+    "uco_facets": [
+      "WindowsServiceFacet"
+    ],
+    "tier": "official"
+  },
+  "ActiveDirectory": {
+    "uco_class": "uco-observable:WindowsActiveDirectoryAccount",
+    "uco_facets": [
+      "WindowsActiveDirectoryAccountFacet"
+    ],
+    "tier": "official"
+  },
+  "UserAccount": {
+    "uco_class": "uco-observable:UserAccount",
+    "uco_facets": [
+      "UserAccountFacet",
+      "AccountFacet"
+    ],
+    "tier": "official"
+  },
+  "Device_USB": {
+    "uco_class": "uco-observable:Device",
+    "uco_facets": [
+      "DeviceFacet"
+    ],
+    "tier": "official"
+  },
+  "ArchiveFile": {
+    "uco_class": "uco-observable:ArchiveFile",
+    "uco_facets": [
+      "ArchiveFileFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "official"
+  },
+  "DiskImage_E01": {
+    "uco_class": "uco-observable:Image",
+    "uco_facets": [
+      "ImageFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "official"
+  },
+  "DiskImage_Raw": {
+    "uco_class": "uco-observable:Image",
+    "uco_facets": [
+      "ImageFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "official"
+  },
+  "NTFS": {
+    "uco_class": "uco-observable:NTFSFile",
+    "uco_facets": [
+      "NTFSFileFacet",
+      "FileFacet"
+    ],
+    "tier": "official"
+  },
+  "AlternateDataStream": {
+    "uco_class": "uco-observable:AlternateDataStream",
+    "uco_facets": [
+      "AlternateDataStreamFacet"
+    ],
+    "tier": "official"
+  },
+  "VSS": {
+    "uco_class": "uco-observable:Volume",
+    "uco_facets": [
+      "VolumeFacet",
+      "WindowsVolumeFacet"
+    ],
+    "tier": "official"
+  },
+  "StorageMedium": {
+    "uco_class": "uco-observable:StorageMedium",
+    "uco_facets": [
+      "StorageMediumFacet"
+    ],
+    "tier": "official"
+  },
+  "SRUM": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:SRUMFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "extension",
+    "category": "execution"
+  },
+  "Amcache": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:AmcacheFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "extension",
+    "category": "execution"
+  },
+  "ShimCache": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:ShimCacheFacet"
+    ],
+    "tier": "extension",
+    "category": "execution"
+  },
+  "UserAssist": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:UserAssistFacet"
+    ],
+    "tier": "extension",
+    "category": "execution"
+  },
+  "ShellBags": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:ShellBagFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "JumpList": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:JumpListFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "LNK": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:LNKFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "UsnJrnl": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:UsnJrnlFacet"
+    ],
+    "tier": "extension",
+    "category": "filesystem"
+  },
+  "BAM": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:BAMFacet"
+    ],
+    "tier": "extension",
+    "category": "execution"
+  },
+  "Superfetch": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:SuperfetchFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "execution"
+  },
+  "Thumbs_db": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:ThumbsDbFacet",
+      "FileFacet",
+      "ContentDataFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "Thumbcache": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:ThumbcacheFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "RecycleBin": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:RecycleBinFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "Sysmon": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:SysmonFacet",
+      "EventRecordFacet"
+    ],
+    "tier": "extension",
+    "category": "eventlog"
+  },
+  "PowerShellLog": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:PowerShellLogFacet",
+      "EventRecordFacet"
+    ],
+    "tier": "extension",
+    "category": "eventlog"
+  },
+  "ETW_ETL": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:ETWTraceFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "eventlog"
+  },
+  "WMI": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:WMIFacet"
+    ],
+    "tier": "extension",
+    "category": "persistence"
+  },
+  "BITS": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:BITSJobFacet"
+    ],
+    "tier": "extension",
+    "category": "persistence"
+  },
+  "ActivitiesCache": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:ActivitiesCacheFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "RDP_BitmapCache": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:RDPBitmapCacheFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "WindowsFileHistory": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:FileHistoryFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "CLFS": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:CLFSFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "eventlog"
+  },
+  "SetupAPILog": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:SetupAPILogFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "eventlog"
+  },
+  "OpenSaveMRU": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:OpenSaveMRUFacet",
+      "WindowsRegistryKeyFacet"
+    ],
+    "tier": "extension",
+    "category": "registry"
+  },
+  "ReadyBoot": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:ReadyBootFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "useractivity"
+  },
+  "SCCM": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:SCCMFacet"
+    ],
+    "tier": "extension",
+    "category": "execution"
+  },
+  "RecentFileCache": {
+    "uco_class": "uco-observable:ObservableObject",
+    "uco_facets": [
+      "ioi-ext:RecentFileCacheFacet",
+      "FileFacet"
+    ],
+    "tier": "extension",
+    "category": "execution"
+  }
+}

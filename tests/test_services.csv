@@ -1,0 +1,3 @@
+ServiceName,DisplayName,State,StartMode,PathName,ServiceType,Description,Account
+WebClient,WebClient,Stopped,Manual,C:\Windows\system32\svchost.exe -k LocalService,Win32ShareProcess,Enables Windows-based programs to create and access files,NT AUTHORITY\LocalService
+WMPNetworkSvc,Windows Media Player Network Sharing Service,Running,Auto,C:\Program Files\Windows Media Player\wmpnetwk.exe,Win32OwnProcess,Shares media,NT AUTHORITY\NetworkService

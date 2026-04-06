@@ -1,0 +1,3 @@
+LastModified,Path,Name,Publisher,Version,SHA1,FileSize,ProgramId,FileDescription,CompileTime,BinaryType
+2024-01-15T09:00:00,C:\Windows\System32\cmd.exe,cmd.exe,Microsoft Corporation,10.0.19041.1,ABC123DEF456789012345678901234567890ABCD,289792,0006faf1cffe7f01bfc40a6c00000000f0010000ffff,Windows Command Processor,2024-01-01T00:00:00,PE32
+2024-01-15T10:00:00,C:\Users\admin\Downloads\evil.exe,evil.exe,Unknown,1.0.0,DEF456ABC123789012345678901234567890BCDE,45056,000712345678901234567890123456789abcdef0,Suspicious Binary,2024-01-14T23:00:00,PE64

@@ -1,0 +1,142 @@
+[
+    {
+        "@id": "kb:mft-entry--{ENTRY_UUID}",
+        "@type": "observable:File",
+        "core:hasFacet": [
+            {
+                "@id": "kb:mft-entry-file-facet--{ENTRY_UUID}",
+                "@type": "observable:FileFacet",
+                "observable:fileName": "{FILE_NAME}",
+                "observable:extension": "{FILE_EXTENSION}",
+                "observable:filePath": "{FILE_PATH}",
+                "observable:isDirectory": {
+                    "@type": "xsd:boolean",
+                    "@value": "{IS_DIRECTORY}"
+                },
+                "observable:sizeInBytes": {
+                    "@type": "xsd:integer",
+                    "@value": "{FILE_SIZE}"
+                },
+                "observable:ntfsHardLinkCount": {
+                    "@type": "xsd:integer",
+                    "@value": "{REFERENCE_COUNT}"
+                },
+                "observable:ntfsOwnerSID": "{SECURITY_ID}"
+            },
+            {
+                "@id": "kb:mft-entry-custom-facet--{ENTRY_UUID}",
+                "@type": [
+                    "ioi-ext:MftFacet",
+                    "core:Facet"
+                ],
+                "ioi-ext:entryNumber": {
+                    "@type": "xsd:integer",
+                    "@value": "{ENTRY_NUMBER}"
+                },
+                "ioi-ext:sequenceNumber": {
+                    "@type": "xsd:integer",
+                    "@value": "{SEQUENCE_NUMBER}"
+                },
+                "ioi-ext:mftFlags": {
+                    "@type": "xsd:boolean",
+                    "@value": "{MFT_FLAGS}"
+                },
+                "ioi-ext:inUse": {
+                    "@type": "xsd:boolean",
+                    "@value": "{IN_USE}"
+                },
+                "ioi-ext:parentEntryNumber": {
+                    "@type": "xsd:integer",
+                    "@value": "{PARENT_ENTRY_NUMBER}"
+                },
+                "ioi-ext:parentSequenceNumber": {
+                    "@type": "xsd:integer",
+                    "@value": "{PARENT_SEQUENCE_NUMBER}"
+                },
+                "ioi-ext:parentPath": "{PARENT_PATH}",
+                "ioi-ext:fileName": "{FILE_NAME}",
+                "ioi-ext:extension": "{FILE_EXTENSION}",
+                "ioi-ext:fileSize": {
+                    "@type": "xsd:integer",
+                    "@value": "{FILE_SIZE}"
+                },
+                "ioi-ext:referenceCount": {
+                    "@type": "xsd:integer",
+                    "@value": "{REFERENCE_COUNT}"
+                },
+                "ioi-ext:reparseTarget": "{REPARSE_TARGET}",
+                "ioi-ext:isDirectory": {
+                    "@type": "xsd:boolean",
+                    "@value": "{IS_DIRECTORY}"
+                },
+                "ioi-ext:hasAds": {
+                    "@type": "xsd:boolean",
+                    "@value": "{HAS_ADS}"
+                },
+                "ioi-ext:isAds": {
+                    "@type": "xsd:boolean",
+                    "@value": "{IS_ADS}"
+                },
+                "ioi-ext:siLessThanFn": {
+                    "@type": "xsd:boolean",
+                    "@value": "{SI_LESS_THAN_FN}"
+                },
+                "ioi-ext:uSecZeros": {
+                    "@type": "xsd:integer",
+                    "@value": "{USEC_ZEROS}"
+                },
+                "ioi-ext:copied": {
+                    "@type": "xsd:boolean",
+                    "@value": "{COPIED}"
+                },
+                "ioi-ext:siFlags": "{SI_FLAGS}",
+                "ioi-ext:nameType": "{NAME_TYPE}",
+                "ioi-ext:created0x10": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{CREATED_0X10}"
+                },
+                "ioi-ext:created0x30": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{CREATED_0X30}"
+                },
+                "ioi-ext:lastModified0x10": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{LAST_MODIFIED_0X10}"
+                },
+                "ioi-ext:lastModified0x30": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{LAST_MODIFIED_0X30}"
+                },
+                "ioi-ext:lastRecordChange0x10": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{LAST_RECORD_CHANGE_0X10}"
+                },
+                "ioi-ext:lastRecordChange0x30": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{LAST_RECORD_CHANGE_0X30}"
+                },
+                "ioi-ext:lastAccess0x10": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{LAST_ACCESS_0X10}"
+                },
+                "ioi-ext:lastAccess0x30": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{LAST_ACCESS_0X30}"
+                },
+                "ioi-ext:updateSequenceNumber": {
+                    "@type": "xsd:integer",
+                    "@value": "{UPDATE_SEQUENCE_NUMBER}"
+                },
+                "ioi-ext:logfileSequenceNumber": {
+                    "@type": "xsd:integer",
+                    "@value": "{LOGFILE_SEQUENCE_NUMBER}"
+                },
+                "ioi-ext:securityId": "{SECURITY_ID}",
+                "ioi-ext:objectIdFileDroid": "{OBJECT_ID_FILE_DROID}",
+                "ioi-ext:loggedUtilStream": "{LOGGED_UTIL_STREAM}",
+                "ioi-ext:zoneIdContents": "{ZONE_ID_CONTENTS}",
+                "ioi-ext:sourceFile": "{SOURCE_FILE}"
+            }
+        ]
+    }
+]

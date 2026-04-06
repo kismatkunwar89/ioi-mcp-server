@@ -1,0 +1,4 @@
+Timestamp,FileName,FullPath,Reason,FileAttributes,MFTReference,ParentMFTReference,USN,SourceInfo
+2024-01-15T10:30:05,evil.exe,C:\Users\admin\Downloads\evil.exe,FileCreate,Archive,67890,45678,123456789,0
+2024-01-15T10:30:10,evil.exe,C:\Users\admin\Downloads\evil.exe,DataExtend|DataTruncation,Archive,67890,45678,123456800,0
+2024-01-15T10:35:00,evil.exe,C:\Users\admin\Downloads\evil.exe,FileDelete|Close,Archive,67890,45678,123456900,0

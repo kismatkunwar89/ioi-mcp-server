@@ -1,0 +1,132 @@
+@prefix ioi-ext: <https://ioi-framework.github.io/ns/ioi-ext/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix observable: <https://ontology.unifiedcyberontology.org/uco/observable/> .
+
+# Extension vocabulary used by IoI cases to capture artifact-specific fields
+# that are not covered by core CASE/UCO properties.
+
+# MFT (ioi-ext:MftFacet)
+
+ioi-ext:entryNumber a rdf:Property ;
+  rdfs:label "MFT entry number" ;
+  rdfs:comment "MFT record entry number." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:integer .
+
+ioi-ext:sequenceNumber a rdf:Property ;
+  rdfs:label "MFT sequence number" ;
+  rdfs:comment "MFT record sequence number." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:integer .
+
+ioi-ext:parentEntryNumber a rdf:Property ;
+  rdfs:label "Parent MFT entry number" ;
+  rdfs:comment "Entry number of the parent directory record." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:integer .
+
+ioi-ext:parentPath a rdf:Property ;
+  rdfs:label "Parent path" ;
+  rdfs:comment "Parent directory path for the file entry." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:string .
+
+ioi-ext:created0x10 a rdf:Property ;
+  rdfs:label "MFT SI created time" ;
+  rdfs:comment "$STANDARD_INFORMATION created time (0x10)." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:dateTime .
+
+ioi-ext:created0x30 a rdf:Property ;
+  rdfs:label "MFT FN created time" ;
+  rdfs:comment "$FILE_NAME created time (0x30)." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:dateTime .
+
+ioi-ext:lastModified0x10 a rdf:Property ;
+  rdfs:label "MFT SI modified time" ;
+  rdfs:comment "$STANDARD_INFORMATION modified time (0x10)." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:dateTime .
+
+ioi-ext:lastModified0x30 a rdf:Property ;
+  rdfs:label "MFT FN modified time" ;
+  rdfs:comment "$FILE_NAME modified time (0x30)." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:dateTime .
+
+ioi-ext:lastRecordChange0x10 a rdf:Property ;
+  rdfs:label "MFT SI record change time" ;
+  rdfs:comment "$STANDARD_INFORMATION record change time (0x10)." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:dateTime .
+
+ioi-ext:lastRecordChange0x30 a rdf:Property ;
+  rdfs:label "MFT FN record change time" ;
+  rdfs:comment "$FILE_NAME record change time (0x30)." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:dateTime .
+
+ioi-ext:lastAccess0x10 a rdf:Property ;
+  rdfs:label "MFT SI last access time" ;
+  rdfs:comment "$STANDARD_INFORMATION last access time (0x10)." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:dateTime .
+
+ioi-ext:lastAccess0x30 a rdf:Property ;
+  rdfs:label "MFT FN last access time" ;
+  rdfs:comment "$FILE_NAME last access time (0x30)." ;
+  rdfs:domain ioi-ext:MftFacet ;
+  rdfs:range xsd:dateTime .
+
+# USN (ioi-ext:UsnFacet)
+
+ioi-ext:updateReasons a rdf:Property ;
+  rdfs:label "USN update reasons" ;
+  rdfs:comment "Reason flags recorded in the USN journal for a file update." ;
+  rdfs:domain ioi-ext:UsnFacet ;
+  rdfs:range xsd:string .
+
+ioi-ext:updateTimestamp a rdf:Property ;
+  rdfs:label "USN update timestamp" ;
+  rdfs:comment "Timestamp recorded for a USN update event." ;
+  rdfs:domain ioi-ext:UsnFacet ;
+  rdfs:range xsd:dateTime .
+
+# LNK (ioi-ext:WindowsLnkFacet)
+
+ioi-ext:targetFilePath a rdf:Property ;
+  rdfs:label "LNK target file path" ;
+  rdfs:comment "Resolved target file path referenced by a Windows LNK." ;
+  rdfs:domain ioi-ext:WindowsLnkFacet ;
+  rdfs:range xsd:string .
+
+ioi-ext:targetCreatedTime a rdf:Property ;
+  rdfs:label "LNK target created time" ;
+  rdfs:comment "Target file created time recorded in LNK metadata." ;
+  rdfs:domain ioi-ext:WindowsLnkFacet ;
+  rdfs:range xsd:dateTime .
+
+ioi-ext:targetMftEntryNumber a rdf:Property ;
+  rdfs:label "LNK target MFT entry number" ;
+  rdfs:comment "Target file MFT entry number referenced by the LNK." ;
+  rdfs:domain ioi-ext:WindowsLnkFacet ;
+  rdfs:range xsd:integer .
+
+# Event Log (ioi-ext:EventLogFacet)
+
+ioi-ext:channel a rdf:Property ;
+  rdfs:label "Event log channel" ;
+  rdfs:comment "Windows Event Log channel (e.g., Security, System)." ;
+  rdfs:domain ioi-ext:EventLogFacet ;
+  rdfs:range xsd:string .
+
+# Office XML (ioi-ext:OfficeXMLFacet)
+
+ioi-ext:xmlCreatedTime a rdf:Property ;
+  rdfs:label "Office XML created time" ;
+  rdfs:comment "Created time extracted from Office XML metadata." ;
+  rdfs:domain ioi-ext:OfficeXMLFacet ;
+  rdfs:range xsd:dateTime .

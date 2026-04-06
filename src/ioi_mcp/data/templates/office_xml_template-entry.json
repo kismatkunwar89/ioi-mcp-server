@@ -1,0 +1,83 @@
+[
+    {
+        "@id": "kb:office-doc--{ENTRY_UUID}",
+        "@type": "observable:File",
+        "core:hasFacet": [
+            {
+                "@id": "kb:file-facet--{ENTRY_UUID}",
+                "@type": ["core:Facet", "observable:FileFacet"],
+                "observable:fileName": "{FILE_NAME}",
+                "observable:filePath": "{FILE_PATH}",
+                "observable:extension": "{EXTENSION}",
+                "observable:isDirectory": false,
+                "observable:sizeInBytes": {
+                    "@type": "xsd:integer",
+                    "@value": "{FILE_SIZE}"
+                },
+                "observable:observableCreatedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{MFT_SI_CREATED}"
+                },
+                "observable:modifiedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{MFT_SI_MODIFIED}"
+                },
+                "observable:accessedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{MFT_SI_ACCESSED}"
+                },
+                "observable:metadataChangeTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{MFT_SI_RECORD_CHANGE}"
+                }
+            },
+            {
+                "@id": "kb:mft-facet--{ENTRY_UUID}",
+                "@type": ["core:Facet", "observable:MftRecordFacet"],
+                "observable:mftFileID": {
+                    "@type": "xsd:integer",
+                    "@value": "{MFT_ENTRY_NUMBER}"
+                },
+                "observable:mftParentID": {
+                    "@type": "xsd:integer",
+                    "@value": "{MFT_PARENT_ENTRY_NUMBER}"
+                },
+                "observable:mftFileNameCreatedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{MFT_FN_CREATED}"
+                },
+                "observable:mftFileNameModifiedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{MFT_FN_MODIFIED}"
+                },
+                "observable:mftFileNameAccessedTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{MFT_FN_ACCESSED}"
+                },
+                "observable:mftFileNameRecordChangeTime": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{MFT_FN_RECORD_CHANGE}"
+                }
+            },
+            {
+                "@id": "kb:content-facet--{ENTRY_UUID}",
+                "@type": ["core:Facet", "observable:ContentDataFacet"],
+                "observable:creator": "{DC_CREATOR}"
+            },
+            {
+                "@id": "kb:xml-metadata-facet--{ENTRY_UUID}",
+                "@type": ["core:Facet", "ioi-ext:OfficeXmlMetadataFacet"],
+                "ioi-ext:dctermsCreated": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{DCTERMS_CREATED}"
+                },
+                "ioi-ext:dctermsModified": {
+                    "@type": "xsd:dateTime",
+                    "@value": "{DCTERMS_MODIFIED}"
+                },
+                "ioi-ext:lastModifiedBy": "{LAST_MODIFIED_BY}",
+                "ioi-ext:metadataSource": "docProps/core.xml"
+            }
+        ]
+    }
+]

@@ -1,0 +1,4 @@
+ExecutionTime,FilePath,UserSID
+2024-01-15T10:30:00,\Device\HarddiskVolume3\Users\admin\Downloads\evil.exe,S-1-5-21-123456-789012-345678-1001
+2024-01-15T10:29:00,\Device\HarddiskVolume3\Windows\System32\cmd.exe,S-1-5-21-123456-789012-345678-1001
+2024-01-15T08:00:00,\Device\HarddiskVolume3\Windows\explorer.exe,S-1-5-21-123456-789012-345678-1001
