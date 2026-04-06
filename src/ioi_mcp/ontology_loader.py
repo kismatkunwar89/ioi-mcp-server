@@ -349,3 +349,121 @@ class OntologyLoader:
             return True, full_iri
         else:
             return False, f"IRI not found in ontology: {full_iri}"
+
+    # ─── Multi-keyword ontology search ────────────────────────────────
+
+    def search_candidates(
+        self, artifact_name: str, description: str = "", threshold: int = 25
+    ) -> list[dict]:
+        """
+        Search the ontology for ObservableObject/Facet candidates matching
+        an artifact using tokenized keyword matching against class names,
+        rdfs:label, and rdfs:comment.
+
+        Returns ranked candidates above the score threshold.
+        Approach follows standard ontology search patterns (ONTOSEARCH2,
+        OAKlib): tokenize query, match against labels + descriptions, rank.
+        """
+        import re
+
+        def tokenize(text: str) -> set[str]:
+            words = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+            words = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1 \2', words)
+            tokens = set()
+            for w in re.split(r'[\s_\-/\\.:()]+', words):
+                w = w.lower().strip()
+                if w and len(w) > 2:
+                    tokens.add(w)
+            return tokens
+
+        stop_words = {
+            "the", "and", "for", "with", "from", "that", "this", "are", "was",
+            "has", "had", "have", "each", "every", "can", "also", "its",
+            "file", "files", "data", "system", "information", "used", "using",
+            "provides", "contains", "including", "entries", "entry", "records",
+            "record", "stored", "level", "based", "changes", "which", "into",
+            "when", "such", "than", "been", "will", "being", "more", "other",
+            "may", "per", "between", "both", "under", "over", "where", "these",
+            "those", "they", "their", "about", "through", "during", "after",
+            "before", "since", "all", "most", "some", "any", "not", "but", "only",
+        }
+
+        name_tokens = tokenize(artifact_name)
+        desc_tokens = tokenize(description) - stop_words
+
+        # Build search space: observables + facets
+        search_space = {}
+        for name_lower, uri in self._observable_index.items():
+            labels = [str(l) for l in self.graph.objects(URIRef(uri), RDFS.label)]
+            comments = [str(c) for c in self.graph.objects(URIRef(uri), RDFS.comment)]
+            search_space[name_lower] = {
+                "uri": str(uri), "type": "observable",
+                "labels": labels, "comments": comments,
+            }
+        for name_lower, uri in self._facet_index.items():
+            labels = [str(l) for l in self.graph.objects(URIRef(uri), RDFS.label)]
+            comments = [str(c) for c in self.graph.objects(URIRef(uri), RDFS.comment)]
+            search_space[name_lower] = {
+                "uri": str(uri), "type": "facet",
+                "labels": labels, "comments": comments,
+            }
+
+        candidates = []
+        for class_name, info in search_space.items():
+            score = 0
+            class_tokens = tokenize(class_name)
+            all_text = " ".join(
+                [class_name] + info["labels"] + info["comments"]
+            ).lower()
+
+            # Exact name match (highest signal)
+            if artifact_name.lower() == class_name:
+                score += 100
+            # Artifact name is substring of class name
+            if artifact_name.lower() in class_name:
+                score += 50
+            # Class name is substring of artifact name (min length 4)
+            if class_name in artifact_name.lower() and len(class_name) > 3:
+                score += 40
+            # Token overlap between artifact name and class name
+            name_overlap = name_tokens & class_tokens
+            if name_overlap:
+                score += len(name_overlap) * 20
+            # Artifact name tokens found in labels/comments
+            for t in name_tokens:
+                if t in all_text and t not in class_tokens:
+                    score += 10
+            # Description tokens matching class name tokens
+            desc_overlap = desc_tokens & class_tokens
+            if desc_overlap:
+                score += len(desc_overlap) * 8
+            # Description tokens in labels/comments
+            for t in desc_tokens:
+                if len(t) > 3 and t in all_text and t not in class_tokens:
+                    score += 3
+
+            if score >= threshold:
+                local_name = info["uri"].split("/")[-1]
+                # Find associated facets for observables
+                facets = []
+                if info["type"] == "observable":
+                    for fn, fu in self._facet_index.items():
+                        if local_name.lower() in fn or fn.replace("facet", "") == class_name:
+                            props = self.get_facet_properties(
+                                str(fu).split("/")[-1]
+                            )
+                            facets.append({
+                                "facet": str(fu).split("/")[-1],
+                                "property_count": len(props),
+                            })
+
+                candidates.append({
+                    "class": local_name,
+                    "uri": info["uri"],
+                    "type": info["type"],
+                    "score": score,
+                    "facets": facets if facets else None,
+                })
+
+        candidates.sort(key=lambda x: -x["score"])
+        return candidates[:5]

@@ -549,12 +549,24 @@ def _handle_resolve(args: dict) -> list[TextContent]:
         }
 
     else:
-        # Nothing found — full extension path
+        # Nothing found via exact match — search for candidates
+        # Uses tokenized keyword search against rdfs:label + rdfs:comment
+        wiki_desc = _ontology.get_artifact_description(artifact_name)
+        # wiki_desc can be a dict or string — extract the description text
+        desc_text = ""
+        if isinstance(wiki_desc, dict):
+            desc_text = wiki_desc.get("description", "")
+        elif isinstance(wiki_desc, str):
+            desc_text = wiki_desc
+
+        candidates = _ontology.search_candidates(
+            artifact_name,
+            description=desc_text,
+            threshold=25,
+        )
+
         # Still provide FileFacet + ContentDataFacet properties as context
         facet_details = _build_facet_details(["FileFacet", "ContentDataFacet"])
-
-        # Get forensics.wiki description if available
-        wiki_desc = _ontology.get_artifact_description(artifact_name)
 
         result = {
             "found": False,
@@ -580,6 +592,17 @@ def _handle_resolve(args: dict) -> list[TextContent]:
                 "ioi-ext: properties. Then call generate_graph with your mapping."
             ),
         }
+
+        # Add ontology candidates if any scored above threshold
+        if candidates:
+            result["ontology_candidates"] = candidates
+            result["candidates_note"] = (
+                "Possible CASE/UCO matches found via keyword search. "
+                "These are NOT auto-selected — review them and use "
+                "get_facet_properties to inspect before deciding. "
+                "If a candidate fits, use its class as @type and map "
+                "CSV columns to its Facet properties."
+            )
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
