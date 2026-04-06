@@ -1,0 +1,465 @@
+{
+  "MFT": {
+    "full_name": "NTFS Master File Table",
+    "description": "The $MFT is the primary metadata structure in NTFS. Every file and directory on an NTFS volume has at least one entry in the MFT. Contains $STANDARD_INFORMATION (0x10) and $FILE_NAME (0x30) attributes with independent timestamp sets, entry numbers, sequence numbers, parent references, and file attribute flags.",
+    "location": "NTFS root: $MFT",
+    "url": "https://forensics.wiki/ntfs/",
+    "common_tools": [
+      "MFTECmd",
+      "analyzeMFT",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "EntryNumber",
+      "SequenceNumber",
+      "ParentEntryNumber",
+      "FileName",
+      "FileSize",
+      "IsDirectory",
+      "Created0x10",
+      "Created0x30",
+      "LastModified0x10",
+      "LastModified0x30",
+      "LastRecordChange0x10",
+      "LastRecordChange0x30",
+      "LastAccess0x10",
+      "LastAccess0x30",
+      "SiFlags",
+      "InUse"
+    ],
+    "forensic_significance": "Dual timestamp attributes ($SI vs $FN) are key to timestomping detection. $SI can be modified by user-mode APIs; $FN can only be changed by the kernel."
+  },
+  "USNJournal": {
+    "full_name": "NTFS Update Sequence Number Journal",
+    "description": "The $UsnJrnl ($J alternate data stream) records file system changes at a granular level including creates, deletes, renames, data modifications, and truncations. Each entry contains reason codes, timestamps, file references, and parent references.",
+    "location": "NTFS root: $Extend\\$UsnJrnl:$J",
+    "url": "https://forensics.wiki/usnjrnl/",
+    "common_tools": [
+      "MFTECmd",
+      "ANJP",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "Name",
+      "Extension",
+      "EntryNumber",
+      "SequenceNumber",
+      "ParentEntryNumber",
+      "UpdateSequenceNumber",
+      "UpdateTimestamp",
+      "UpdateReasons",
+      "FileAttributes"
+    ],
+    "forensic_significance": "Provides corroborating evidence for file operations. UpdateReasons flags (FileCreate, FileDelete, DataTruncation, DataOverwrite) reveal low-level operations even when higher-level artifacts are manipulated."
+  },
+  "Prefetch": {
+    "full_name": "Windows Prefetch",
+    "description": "Windows Prefetch files (.pf) record application execution metadata to optimize future launches. Each file tracks the executable name, run count, last 8 execution times, volume information, and files/directories accessed during startup.",
+    "location": "C:\\Windows\\Prefetch\\*.pf",
+    "url": "https://forensics.wiki/prefetch/",
+    "common_tools": [
+      "PECmd",
+      "WinPrefetchView",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "ExecutableName",
+      "Hash",
+      "RunCount",
+      "LastRun",
+      "PreviousRun0-7",
+      "Size",
+      "Volume0Name",
+      "Volume0Serial",
+      "FilesLoaded",
+      "Directories"
+    ],
+    "forensic_significance": "Proves application execution even after the binary is deleted. Hash in filename allows distinguishing executables run from different paths."
+  },
+  "EVTX": {
+    "full_name": "Windows XML Event Log",
+    "description": "Windows Event Logs (.evtx) record system, security, and application events. Security.evtx contains logon events (4624/4625), process creation (4688), privilege use (4672), and audit log clearing (1102). Each record has EventID, timestamp, provider, channel, and structured payload data.",
+    "location": "C:\\Windows\\System32\\winevt\\Logs\\*.evtx",
+    "url": "https://forensics.wiki/windows_xml_event_log_(evtx)/",
+    "common_tools": [
+      "EvtxECmd",
+      "Get-WinEvent",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "EventRecordId",
+      "TimeCreated",
+      "EventId",
+      "Level",
+      "Provider",
+      "Channel",
+      "Computer",
+      "UserId",
+      "ProcessId",
+      "ThreadId",
+      "PayloadData1-6"
+    ],
+    "forensic_significance": "Event 1102 specifically indicates audit log clearing. Cross-referencing with USN journal timestamps reveals the temporal ordering of log manipulation."
+  },
+  "LNK": {
+    "full_name": "Windows Shortcut (Shell Link)",
+    "description": "LNK files (.lnk) are Windows shell links that store target file metadata including creation/modification/access timestamps, file size, volume information, local/network paths, MAC address, and machine ID. LNK files preserve target timestamps from the time the shortcut was created.",
+    "location": "C:\\Users\\*\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\*.lnk",
+    "url": "https://forensics.wiki/lnk/",
+    "common_tools": [
+      "LECmd",
+      "LNKParser",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "SourceFile",
+      "SourceCreated",
+      "SourceModified",
+      "TargetCreated",
+      "TargetModified",
+      "TargetAccessed",
+      "FileSize",
+      "LocalPath",
+      "VolumeSerialNumber",
+      "MachineID",
+      "MacAddress",
+      "TargetMFTEntryNumber"
+    ],
+    "forensic_significance": "Preserves original target file timestamps independent of filesystem manipulation. Key artifact for detecting timestomping \u2014 LNK target creation time should match MFT $FN timestamp."
+  },
+  "Amcache": {
+    "full_name": "Windows Application Compatibility Cache (Amcache.hve)",
+    "description": "Amcache.hve is a registry hive that tracks application execution and installation. Records SHA1 hashes, file paths, sizes, PE metadata (link date, binary type), publisher information, and file key timestamps for executables that have run on the system.",
+    "location": "C:\\Windows\\AppCompat\\Programs\\Amcache.hve",
+    "url": "https://forensics.wiki/amcache/",
+    "common_tools": [
+      "AmcacheParser",
+      "RegRipper",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "ApplicationName",
+      "ProgramId",
+      "FileKeyLastWriteTimestamp",
+      "SHA1",
+      "FullPath",
+      "Name",
+      "FileExtension",
+      "LinkDate",
+      "Size",
+      "Version",
+      "BinaryType",
+      "IsPeFile",
+      "Publisher"
+    ],
+    "forensic_significance": "Provides evidence of program execution with SHA1 hash verification. Survives file deletion \u2014 the Amcache entry persists after the executable is removed."
+  },
+  "ShimCache": {
+    "full_name": "Windows Application Compatibility Shimcache",
+    "description": "AppCompatCache (ShimCache) is stored in the SYSTEM registry hive and records file path, last modification time, and execution flag for executables. Entries are written on system shutdown, not at execution time.",
+    "location": "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\AppCompatCache",
+    "url": "https://forensics.wiki/windows_application_compatibility/",
+    "common_tools": [
+      "AppCompatCacheParser",
+      "ShimCacheParser",
+      "RegRipper"
+    ],
+    "common_fields": [
+      "ControlSet",
+      "CacheEntryPosition",
+      "Path",
+      "LastModifiedTimeUTC",
+      "Executed",
+      "Duplicate"
+    ],
+    "forensic_significance": "Cache entry position indicates relative execution order. 'Executed' flag (Windows 7/8) or presence in cache (Windows 10+) indicates the file existed and was shimmed."
+  },
+  "SRUM": {
+    "full_name": "System Resource Usage Monitor",
+    "description": "SRUM tracks per-application resource consumption including network bytes sent/received, CPU cycle time, foreground/background context switches, memory usage, and face time. Data is stored in an ESE database (SRUDB.dat) with entries timestamped hourly.",
+    "location": "C:\\Windows\\System32\\sru\\SRUDB.dat",
+    "url": "https://forensics.wiki/system_resource_usage_monitor/",
+    "common_tools": [
+      "SrumECmd",
+      "srum-dump",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "Id",
+      "Timestamp",
+      "ExeInfo",
+      "SidType",
+      "Sid",
+      "UserName",
+      "AppId",
+      "BackgroundBytesRead",
+      "BackgroundBytesWritten",
+      "ForegroundBytesRead",
+      "ForegroundBytesWritten",
+      "FaceTime"
+    ],
+    "forensic_significance": "Proves application was running at specific times with quantified resource usage. Survives clearing of Prefetch, event logs, and browser history."
+  },
+  "UserAssist": {
+    "full_name": "Windows UserAssist Registry Keys",
+    "description": "UserAssist tracks GUI-based program execution via Explorer. Stored in NTUSER.DAT under Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist. Values are ROT13 encoded. Records run count, focus count, focus time, and last execution timestamp.",
+    "location": "NTUSER.DAT\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist\\{GUID}\\Count",
+    "url": "https://forensics.wiki/usb_history_viewing/",
+    "common_tools": [
+      "RECmd",
+      "UserAssist",
+      "RegRipper"
+    ],
+    "common_fields": [
+      "BatchKeyPath",
+      "BatchValueName",
+      "ProgramName",
+      "RunCounter",
+      "FocusCount",
+      "FocusTime",
+      "LastExecuted"
+    ],
+    "forensic_significance": "Tracks GUI program launches specifically through Explorer (Start Menu, desktop shortcuts, etc.). Complements Prefetch which tracks all execution."
+  },
+  "ShellBags": {
+    "full_name": "Windows Shell Bags",
+    "description": "ShellBags record folder access and window positioning preferences in NTUSER.DAT and UsrClass.dat. They preserve evidence of folder navigation including folders that have since been deleted, renamed, or accessed via removable media.",
+    "location": "NTUSER.DAT\\Software\\Microsoft\\Windows\\Shell\\BagMRU and Bags; UsrClass.dat\\Local Settings\\Software\\Microsoft\\Windows\\Shell",
+    "url": "https://forensics.wiki/shell_bags/",
+    "common_tools": [
+      "SBECmd",
+      "ShellBagsExplorer",
+      "RegRipper"
+    ],
+    "common_fields": [
+      "AbsolutePath",
+      "NodeSlot",
+      "ShellType",
+      "Value",
+      "LastWriteTime",
+      "MFTEntry",
+      "CreatedOn",
+      "AccessedOn",
+      "ModifiedOn"
+    ],
+    "forensic_significance": "Proves a user navigated to a specific folder even after the folder is deleted. Timestamps reflect actual folder access, not file modification."
+  },
+  "JumpList": {
+    "full_name": "Windows Jump Lists",
+    "description": "Jump Lists track recently and frequently accessed files per application. Stored as OLE compound files in Recent\\AutomaticDestinations and CustomDestinations. Each entry contains an embedded LNK with full target metadata.",
+    "location": "C:\\Users\\*\\AppData\\Roaming\\Microsoft\\Windows\\Recent\\AutomaticDestinations\\*.automaticDestinations-ms",
+    "url": "https://forensics.wiki/jump_lists/",
+    "common_tools": [
+      "JLECmd",
+      "JumpListExplorer",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "SourceFile",
+      "AppId",
+      "AppIdDescription",
+      "EntryNumber",
+      "CreationTime",
+      "LastModified",
+      "Hostname",
+      "MacAddress",
+      "Path",
+      "InteractionCount",
+      "LocalPath",
+      "TargetCreated",
+      "TargetModified"
+    ],
+    "forensic_significance": "Links specific applications to specific files with timestamps and interaction counts. Machine ID and MAC address can prove which system accessed the file."
+  },
+  "RecycleBin": {
+    "full_name": "Windows Recycle Bin ($Recycle.Bin)",
+    "description": "The Recycle Bin stores deleted files with $I (metadata: original path, deletion time, file size) and $R (actual file content) pairs per user SID. Provides deletion timestamps and original file locations.",
+    "location": "C:\\$Recycle.Bin\\{UserSID}\\",
+    "url": "https://forensics.wiki/recycle_bin/",
+    "common_tools": [
+      "RBCmd",
+      "Rifiuti2",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "SourceName",
+      "FileType",
+      "FileName",
+      "FileSize",
+      "DeletedOn"
+    ],
+    "forensic_significance": "Records when and from where files were deleted. $I files survive even after $R (content) is purged."
+  },
+  "BrowserHistory": {
+    "full_name": "Web Browser History (Chrome/Firefox/Edge)",
+    "description": "Browser history databases record visited URLs, visit timestamps, visit counts, page titles, and transition types. Chrome uses SQLite (History file), Firefox uses places.sqlite, Edge uses Chromium-based History.",
+    "location": "Chrome: C:\\Users\\*\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\History",
+    "url": "https://forensics.wiki/google_chrome/",
+    "common_tools": [
+      "Hindsight",
+      "DB Browser for SQLite",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "URL",
+      "Title",
+      "VisitTime",
+      "VisitCount",
+      "TypedCount",
+      "TransitionType"
+    ],
+    "forensic_significance": "Selective deletion of history entries leaves IndexedDB cache and other browser artifacts intact, creating semantic contradictions detectable via IoI rules."
+  },
+  "OfficeMetadata": {
+    "full_name": "Microsoft Office Document Metadata",
+    "description": "Office Open XML documents (.docx, .xlsx, .pptx) contain embedded metadata in docProps/core.xml including creation time, modification time, creator, and last modified by. These timestamps are independent of filesystem timestamps.",
+    "location": "Inside .docx/.xlsx/.pptx ZIP: docProps/core.xml",
+    "url": "https://forensics.wiki/microsoft_office/",
+    "common_tools": [
+      "7-Zip",
+      "ExifTool",
+      "python-docx"
+    ],
+    "common_fields": [
+      "dcterms:created",
+      "dcterms:modified",
+      "dc:creator",
+      "cp:lastModifiedBy"
+    ],
+    "forensic_significance": "Embedded creation time predating filesystem creation time indicates timestomping \u2014 the document existed before the forged filesystem timestamp."
+  },
+  "BAM": {
+    "full_name": "Background Activity Moderator",
+    "description": "BAM tracks execution of background applications with timestamps. Stored in SYSTEM registry hive under ControlSet\\Services\\bam\\State\\UserSettings\\{SID}.",
+    "location": "SYSTEM\\CurrentControlSet\\Services\\bam\\State\\UserSettings\\{SID}",
+    "url": "https://forensics.wiki/background_activity_moderator/",
+    "common_tools": [
+      "RECmd",
+      "RegRipper"
+    ],
+    "common_fields": [
+      "ExecutionTime",
+      "FilePath",
+      "UserSID"
+    ],
+    "forensic_significance": "Provides execution timestamps for background applications. Complements Prefetch and UserAssist with different coverage."
+  },
+  "BITS": {
+    "full_name": "Background Intelligent Transfer Service",
+    "description": "BITS manages asynchronous file transfers between machines. BITS jobs can be used for persistence and data exfiltration. Job metadata includes URL, file path, creation/modification times, and transfer status.",
+    "location": "C:\\ProgramData\\Microsoft\\Network\\Downloader\\qmgr.db",
+    "url": "https://forensics.wiki/bits/",
+    "common_tools": [
+      "BitsParser",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "JobId",
+      "JobName",
+      "URL",
+      "FilePath",
+      "CreationTime",
+      "ModifiedTime",
+      "State",
+      "BytesTransferred"
+    ],
+    "forensic_significance": "Used by APT groups for persistence (T1197). BITS jobs survive reboots and can transfer files in background without user awareness."
+  },
+  "WMI": {
+    "full_name": "Windows Management Instrumentation",
+    "description": "WMI provides a management infrastructure for monitoring and controlling system resources. WMI event subscriptions can be used for persistence. The WMI repository (OBJECTS.DATA) contains class definitions, instances, and event bindings.",
+    "location": "C:\\Windows\\System32\\wbem\\Repository\\OBJECTS.DATA",
+    "url": "https://forensics.wiki/wmi/",
+    "common_tools": [
+      "PyWMIPersistenceFinder",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "Namespace",
+      "ClassName",
+      "EventFilter",
+      "EventConsumer",
+      "FilterToConsumerBinding"
+    ],
+    "forensic_significance": "WMI event subscriptions (T1546.003) provide fileless persistence. Event filters + consumers + bindings create trigger-action pairs that survive reboots."
+  },
+  "Sysmon": {
+    "full_name": "System Monitor (Sysmon) Event Logs",
+    "description": "Sysmon is a Windows system service that logs detailed process creation (Event 1), network connections (Event 3), file creation time changes (Event 2), and other security-relevant events to Microsoft-Windows-Sysmon/Operational log.",
+    "location": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Sysmon%4Operational.evtx",
+    "url": "https://forensics.wiki/sysmon/",
+    "common_tools": [
+      "EvtxECmd",
+      "Sysmon",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "EventID",
+      "UtcTime",
+      "ProcessId",
+      "Image",
+      "CommandLine",
+      "ParentImage",
+      "Hashes",
+      "SourceIp",
+      "DestinationIp",
+      "DestinationPort"
+    ],
+    "forensic_significance": "Event ID 2 (FileCreateTimeChange) directly detects timestomping attempts. Event ID 1 provides full command-line logging of process execution."
+  },
+  "Thumbcache": {
+    "full_name": "Windows Thumbnail Cache",
+    "description": "Windows generates and caches thumbnail images for files viewed in Explorer. Thumbnails persist in thumbcache_*.db files even after the original files are deleted.",
+    "location": "C:\\Users\\*\\AppData\\Local\\Microsoft\\Windows\\Explorer\\thumbcache_*.db",
+    "url": "https://forensics.wiki/windows_thumbcache/",
+    "common_tools": [
+      "Thumbcache Viewer",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "CacheEntryHash",
+      "ThumbnailData",
+      "FileSize"
+    ],
+    "forensic_significance": "Thumbnails survive file deletion. Proves a user viewed files that no longer exist on the system."
+  },
+  "ActivitiesCache": {
+    "full_name": "Windows Timeline / ActivitiesCache.db",
+    "description": "Windows Timeline tracks user activities across applications. Stored in ActivitiesCache.db SQLite database. Records application usage, file access, and web browsing with timestamps and duration.",
+    "location": "C:\\Users\\*\\AppData\\Local\\ConnectedDevicesPlatform\\*\\ActivitiesCache.db",
+    "url": "https://forensics.wiki/windows_timeline/",
+    "common_tools": [
+      "WxTCmd",
+      "DB Browser for SQLite"
+    ],
+    "common_fields": [
+      "ActivityId",
+      "AppId",
+      "ActivityType",
+      "StartTime",
+      "EndTime",
+      "LastModifiedTime",
+      "Payload"
+    ],
+    "forensic_significance": "Cross-device activity tracking. Records application focus time and content payloads that survive clearing of browser history and recent files."
+  },
+  "VSS": {
+    "full_name": "Volume Shadow Copy Service",
+    "description": "VSS creates point-in-time snapshots of volumes. Shadow copies are stored under System Volume Information and contain GUID-identified snapshot directories. Deletion of shadow copies removes recovery points but leaves infrastructure artifacts.",
+    "location": "C:\\System Volume Information\\{GUID}",
+    "url": "https://forensics.wiki/windows_shadow_volumes/",
+    "common_tools": [
+      "vssadmin",
+      "vshadowinfo",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "ShadowCopyID",
+      "ShadowCopySetID",
+      "OriginalVolume",
+      "CreationTime",
+      "SnapshotAttributes"
+    ],
+    "forensic_significance": "VSS infrastructure files persist after shadow copy deletion. Absence of GUID directories when infrastructure exists indicates deliberate deletion (AF-004 IoI pattern)."
+  }
+}

@@ -96,6 +96,14 @@ class OntologyLoader:
         # Index ioi-ext / dfc-ext properties by their rdfs:domain (facet name)
         self._build_ext_property_index()
 
+        # Load forensics.wiki artifact descriptions
+        self._artifact_descriptions = {}
+        wiki_index = data_dir / "forensics_wiki_index.json"
+        if wiki_index.exists():
+            import json as _json
+            with open(wiki_index) as _f:
+                self._artifact_descriptions = _json.load(_f)
+
     def _build_ext_property_index(self):
         """Index ioi-ext properties by their rdfs:domain facet."""
         IOI_EXT_NS_STR = str(IOI_EXT)  # https://ioi-framework.github.io/ns/ioi-ext/
@@ -165,6 +173,15 @@ class OntologyLoader:
     def get_all_ext_facets(self) -> dict[str, list[dict]]:
         """Get all extension facets and their properties."""
         return dict(self._ext_property_index)
+
+    def get_artifact_description(self, artifact_name: str) -> dict | None:
+        """Get forensics.wiki description for an artifact (case-insensitive)."""
+        for key, val in self._artifact_descriptions.items():
+            if key.lower() == artifact_name.lower():
+                return val
+            if val.get("full_name", "").lower() == artifact_name.lower():
+                return val
+        return None
 
     def _get_all_subclasses(self, cls: URIRef) -> set[URIRef]:
         """Get all transitive subclasses of a class."""

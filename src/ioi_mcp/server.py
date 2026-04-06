@@ -341,12 +341,15 @@ def _handle_resolve(args: dict) -> list[TextContent]:
 
         facet_details = _build_facet_details(facet_names)
 
+        wiki_desc = _ontology.get_artifact_description(artifact_name)
+
         result = {
             "found": True,
             "source": "ontology",
             "artifact": artifact_name,
             "tier": "official",
             "uco_class": obs_class,
+            "artifact_description": wiki_desc,
             "facets": facet_details,
             "next_step": (
                 "Call analyze_csv with your CSV file to see column headers and sample values. "
@@ -360,12 +363,16 @@ def _handle_resolve(args: dict) -> list[TextContent]:
         # Still provide FileFacet + ContentDataFacet properties as context
         facet_details = _build_facet_details(["FileFacet", "ContentDataFacet"])
 
+        # Get forensics.wiki description if available
+        wiki_desc = _ontology.get_artifact_description(artifact_name)
+
         result = {
             "found": False,
             "source": "none",
             "artifact": artifact_name,
             "tier": "extension",
             "uco_class": "uco-observable:ObservableObject",
+            "artifact_description": wiki_desc,
             "message": (
                 f"'{artifact_name}' has no dedicated class or facet in CASE/UCO. "
                 "All CSV columns will become ioi-ext: extension properties. "
