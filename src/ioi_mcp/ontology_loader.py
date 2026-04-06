@@ -98,7 +98,8 @@ class OntologyLoader:
 
         # Load forensics.wiki artifact descriptions
         self._artifact_descriptions = {}
-        wiki_index = data_dir / "forensics_wiki_index.json"
+        _data_dir = Path(__file__).parent / "data"
+        wiki_index = _data_dir / "forensics_wiki_index.json"
         if wiki_index.exists():
             import json as _json
             with open(wiki_index) as _f:
