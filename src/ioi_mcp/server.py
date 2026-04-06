@@ -394,10 +394,13 @@ async def list_tools() -> list[Tool]:
                         "type": "object",
                         "description": (
                             "Object with: 'facet_type' (str, e.g. 'ioi-ext:MftFacet'), "
-                            "'entity_type' (str, e.g. 'observable:File'), "
-                            "'properties' (object mapping property IRIs to typed values like "
-                            "{'@type': 'xsd:dateTime', '@value': '2025-02-16T10:15:00'}), "
-                            "'extra_facets' (array, optional additional facets)"
+                            "'entity_type' (str, e.g. 'observable:ObservableObject'), "
+                            "'properties' (object mapping property IRIs to typed values: "
+                            "{'ioi-ext:created0x10': {'@type': 'xsd:dateTime', '@value': '2025-02-16T10:15:00'}}), "
+                            "'extra_facets' (array of additional facets attached to the same entry, "
+                            "e.g. [{'type': 'observable:FileFacet', 'properties': "
+                            "{'observable:fileName': {'@type': 'xsd:string', '@value': 'malware.exe'}}}] "
+                            "— use this to add FileFacet alongside the artifact-specific facet)"
                         ),
                     },
                     "output_path": {

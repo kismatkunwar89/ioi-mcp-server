@@ -123,7 +123,12 @@ def extract_sparql_context(
 
 
 def _extract_from_node(node: dict, types_used: set, properties: list, seen_props: set):
-    """Recursively extract types and properties from a JSON-LD node."""
+    """Recursively extract types and properties from ALL nested nodes.
+    
+    Walks into core:hasFacet arrays to reach facet nodes where
+    ioi-ext: properties live. The seen_props set prevents duplicate
+    property entries but does NOT block recursion into child nodes.
+    """
     if not isinstance(node, dict):
         return
 
@@ -137,79 +142,104 @@ def _extract_from_node(node: dict, types_used: set, properties: list, seen_props
         elif isinstance(node_type, str) and ":" in node_type:
             types_used.add(node_type)
 
-    # Extract properties
+    # Extract properties from this node
     for key, value in node.items():
         if key.startswith("@"):
             continue
 
         prop_key = key
-        if prop_key in seen_props:
-            continue
-        seen_props.add(prop_key)
 
-        # Determine type from value
+        # Determine type from value and record if not seen
         if isinstance(value, dict):
             if "@type" in value and "@value" in value:
-                xsd_type = value["@type"]
-                sample = str(value["@value"])[:50]
-                properties.append({
-                    "property": prop_key,
-                    "type": xsd_type,
-                    "sample_value": sample,
-                })
+                if prop_key not in seen_props:
+                    seen_props.add(prop_key)
+                    xsd_type = value["@type"]
+                    sample = str(value["@value"])[:50]
+                    properties.append({
+                        "property": prop_key,
+                        "type": xsd_type,
+                        "sample_value": sample,
+                    })
             elif "@id" in value:
-                properties.append({
-                    "property": prop_key,
-                    "type": "object_ref",
-                    "sample_value": str(value.get("@id", ""))[:50],
-                })
+                if prop_key not in seen_props:
+                    seen_props.add(prop_key)
+                    properties.append({
+                        "property": prop_key,
+                        "type": "object_ref",
+                        "sample_value": str(value.get("@id", ""))[:50],
+                    })
             else:
+                # Always recurse into nested objects (facet nodes etc.)
                 _extract_from_node(value, types_used, properties, seen_props)
         elif isinstance(value, list):
-            if value and isinstance(value[0], dict):
-                _extract_from_node(value[0], types_used, properties, seen_props)
+            # Recurse into ALL list items, not just the first
+            for item in value:
+                if isinstance(item, dict):
+                    _extract_from_node(item, types_used, properties, seen_props)
         elif isinstance(value, str):
-            properties.append({
-                "property": prop_key,
-                "type": "xsd:string",
-                "sample_value": value[:50],
-            })
+            if prop_key not in seen_props:
+                seen_props.add(prop_key)
+                properties.append({
+                    "property": prop_key,
+                    "type": "xsd:string",
+                    "sample_value": value[:50],
+                })
 
 
 def _build_sparql_template(graphs: list, category: str) -> str:
-    """Build a skeleton SPARQL template."""
+    """Build a skeleton SPARQL template.
+    
+    Always wraps patterns in GRAPH ?g {} for rdflib Dataset compatibility.
+    Uses correct triple structure: ?entry core:hasFacet ?facet, then
+    ?facet <property> ?value.
+    """
     prefix_lines = "\n".join(
         f"PREFIX {k}: <{v}>" for k, v in IOI_PREFIXES.items()
     )
 
-    graph_blocks = []
-    for g in graphs:
-        vars_list = []
-        patterns = []
-        for p in g["properties_used"][:5]:  # First 5 properties as example
-            var_name = p["property"].split(":")[-1]
-            patterns.append(f"      ?facet {p['property']} ?{var_name} .")
-            vars_list.append(f"?{var_name}")
+    # Collect all select variables and build pattern blocks
+    select_vars = ["?entry"]
+    all_patterns = []
 
-        block = f"""  GRAPH <{g['graph_iri']}> {{
-    ?{g['name'].lower()}Facet a <FACET_TYPE> ;
-{chr(10).join(patterns)}
-    ?{g['name'].lower()}Entry core:hasFacet ?{g['name'].lower()}Facet .
-  }}"""
-        graph_blocks.append(block)
+    for g in graphs:
+        patterns = []
+        for p in g["properties_used"][:8]:  # First 8 properties
+            var_name = p["property"].split(":")[-1]
+            if f"?{var_name}" not in select_vars:
+                select_vars.append(f"?{var_name}")
+            patterns.append(f"    ?facet {p['property']} ?{var_name} .")
+
+        if patterns:
+            all_patterns.extend(patterns)
+
+    # Single GRAPH ?g block (works for both single-graph and multi-graph queries)
+    pattern_block = "\n".join(all_patterns)
 
     filter_hint = {
-        "temporal": "  # FILTER: Compare datetime values across graphs\n  # FILTER(?timestamp1 != ?timestamp2)",
-        "structural": "  # FILTER NOT EXISTS: Check for missing artifacts\n  # FILTER NOT EXISTS { GRAPH <...> { ?x a <type> } }",
-        "semantic": "  # FILTER: Match/mismatch values across graphs\n  # FILTER(?value1 != ?value2)",
+        "temporal": (
+            "  # FILTER: Compare datetime values\n"
+            "  # FILTER(?timestamp1 != ?timestamp2)"
+        ),
+        "structural": (
+            "  # FILTER NOT EXISTS: Check for missing data\n"
+            "  # FILTER NOT EXISTS { ?facet <property> ?val }"
+        ),
+        "semantic": (
+            "  # FILTER: Match/mismatch values\n"
+            "  # FILTER(?value1 != ?value2)"
+        ),
     }
 
     return f"""{prefix_lines}
 
-SELECT DISTINCT ?result_var1 ?result_var2
+SELECT DISTINCT {' '.join(select_vars[:6])}
 WHERE {{
-{chr(10).join(graph_blocks)}
+  GRAPH ?g {{
+    ?entry core:hasFacet ?facet .
+{pattern_block}
+  }}
 
 {filter_hint.get(category, '  # FILTER: (add detection logic)')}
 }}
-ORDER BY ?result_var1"""
+ORDER BY ?entry"""
