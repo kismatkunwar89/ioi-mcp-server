@@ -251,20 +251,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["jsonld_path"],
             },
         ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "description": "Filter by category",
-                    },
-                    "tier": {
-                        "type": "string",
-                        "description": "Filter by tier: 'official' or 'extension'",
-                    },
-                },
-            },
-        ),
     ]
 
 
