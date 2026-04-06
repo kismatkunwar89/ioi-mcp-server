@@ -31,6 +31,7 @@ from ioi_mcp.ontology_loader import OntologyLoader
 from ioi_mcp.manifest import ManifestRegistry
 from ioi_mcp.graph_builder import GraphBuilder
 from ioi_mcp.constraint_builder import build_generation_context
+from ioi_mcp.batch_generator import generate_all_rows
 from ioi_mcp.validator import Validator
 from ioi_mcp.type_inferencer import analyze_csv as _analyze_csv
 
@@ -191,9 +192,51 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
+            name="generate_all_rows",
+            description=(
+                "Generate a complete CASE/UCO JSON-LD knowledge graph from ALL rows in a CSV file. "
+                "Use this when the user says 'generate JSON-LD', 'create knowledge graph', "
+                "'represent artifact as CASE/UCO', 'convert CSV to JSON-LD', or 'generate graph for all rows'. "
+                "Takes the column mapping (from your reasoning after resolve_artifact + analyze_csv) "
+                "and deterministically generates one ObservableObject per CSV row with correct typed literals. "
+                "Handles both official CASE/UCO properties and ioi-ext extension properties. "
+                "Outputs a complete @graph file + Turtle patch. Run validate_graph after this."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "artifact_name": {
+                        "type": "string",
+                        "description": "Artifact name, e.g., 'Prefetch', 'SRUM', 'MFT', 'USNJournal'",
+                    },
+                    "csv_path": {
+                        "type": "string",
+                        "description": "Path to the CSV file with forensic data",
+                    },
+                    "column_mapping": {
+                        "type": "object",
+                        "description": (
+                            "YOUR mapping of CSV columns to CASE/UCO or ioi-ext properties. "
+                            "Keys = CSV column headers (exact). "
+                            "Values = prefixed property names. "
+                            "Example: {'RunCount': 'uco-observable:timesExecuted', "
+                            "'EntryNumber': 'ioi-ext:entryNumber'}. "
+                            "Columns NOT in this mapping become auto-generated ioi-ext: properties."
+                        ),
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Optional description of the artifact",
+                    },
+                },
+                "required": ["artifact_name", "csv_path", "column_mapping"],
+            },
+        ),
+        Tool(
             name="validate_graph",
             description=(
                 "Validate a CASE/UCO JSON-LD file. "
+                "Use this after generate_all_rows to check the output. "
                 "Checks: IRI resolution, @id format, @context completeness, "
                 "rdflib parseability, and SHACL conformance."
             ),
@@ -246,6 +289,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         "resolve_artifact": _handle_resolve,
         "analyze_csv": _handle_analyze_csv,
         "get_generation_context": _handle_generation_context,
+        "generate_all_rows": _handle_generate_all_rows,
         "generate_from_csv": _handle_generate_csv,
         "get_facet_properties": _handle_facet_properties,
         "validate_graph": _handle_validate,
@@ -527,6 +571,52 @@ def _handle_generation_context(args: dict) -> list[TextContent]:
         gen_ctx["turtle_path"] = str(ttl_out)
 
     return [TextContent(type="text", text=json.dumps(gen_ctx, indent=2, default=str))]
+
+
+def _handle_generate_all_rows(args: dict) -> list[TextContent]:
+    """
+    Deterministic batch generation: one ObservableObject per CSV row.
+    Claude provides the column mapping, this tool does the serialization.
+    """
+    artifact_name = args["artifact_name"]
+    csv_path = args["csv_path"]
+    column_mapping = args.get("column_mapping", {})
+    description = args.get("description")
+
+    if not Path(csv_path).exists():
+        return [TextContent(
+            type="text",
+            text=json.dumps({"error": f"CSV file not found: {csv_path}"}),
+        )]
+
+    result = generate_all_rows(
+        ontology=_ontology,
+        manifest=_manifest,
+        artifact_name=artifact_name,
+        csv_path=csv_path,
+        column_mapping=column_mapping,
+        description=description,
+    )
+
+    # Auto-validate the output
+    validation = _validator.validate_jsonld(
+        result["jsonld"],
+        turtle_patch=result.get("turtle_patch"),
+    )
+
+    # Return summary (not the full graph — it could be huge)
+    summary = {
+        "success": True,
+        "artifact_name": artifact_name,
+        "row_count": result["row_count"],
+        "jsonld_path": result["jsonld_path"],
+        "turtle_path": result.get("turtle_path"),
+        "mapped_columns": result["mapped_columns"],
+        "unmapped_columns": result["unmapped_columns"],
+        "validation": validation.to_dict(),
+    }
+
+    return [TextContent(type="text", text=json.dumps(summary, indent=2, default=str))]
 
 
 def _handle_generate_csv(args: dict) -> list[TextContent]:

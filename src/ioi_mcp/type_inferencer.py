@@ -11,21 +11,26 @@ from typing import Optional
 
 # Patterns ordered by specificity (most specific first)
 _PATTERNS = [
-    # ISO 8601 datetime variants
+    # ISO 8601 datetime variants (2024-01-15T10:30:00, 2024-01-15 10:30:00.123)
     (re.compile(
         r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}"
+    ), "xsd:dateTime"),
+
+    # US locale datetime (2/17/2026 19:04, 12/31/2025 3:54)
+    (re.compile(
+        r"^\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}"
     ), "xsd:dateTime"),
 
     # Date only (YYYY-MM-DD)
     (re.compile(r"^\d{4}-\d{2}-\d{2}$"), "xsd:date"),
 
-    # Boolean
-    (re.compile(r"^(true|false|True|False|TRUE|FALSE|0|1)$"), "xsd:boolean"),
+    # Boolean — ONLY true/false words, NOT 0/1 (those are integers in forensics)
+    (re.compile(r"^(true|false|True|False|TRUE|FALSE)$"), "xsd:boolean"),
 
-    # Hex binary (common in forensics: hashes, SIDs encoded)
+    # Hex binary (common in forensics: hashes, SIDs encoded — 32+ hex chars)
     (re.compile(r"^(0x)?[0-9a-fA-F]{32,}$"), "xsd:hexBinary"),
 
-    # Integer (including negative)
+    # Integer (including negative, including 0 and 1)
     (re.compile(r"^-?\d+$"), "xsd:integer"),
 
     # Decimal / float
