@@ -263,6 +263,26 @@ async def list_tools() -> list[Tool]:
                 "required": ["jsonld_path"],
             },
         ),
+        Tool(
+            name="identify_artifact",
+            description=(
+                "Identify the forensic artifact type from a CSV file automatically. "
+                "Matches CSV column headers against known artifact field signatures "
+                "from 85 forensic artifacts. Use this FIRST when the user provides a "
+                "CSV without specifying the artifact type. Returns ranked matches "
+                "with confidence scores, then call resolve_artifact with the top match."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "csv_path": {
+                        "type": "string",
+                        "description": "Path to the CSV file to identify",
+                    },
+                },
+                "required": ["csv_path"],
+            },
+        ),
         # ─── Contribution workflow tools ──────────────────────────
         Tool(
             name="scaffold_case",
@@ -457,6 +477,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     _init()
 
     handlers = {
+        "identify_artifact": _handle_identify,
         "resolve_artifact": _handle_resolve,
         "analyze_csv": _handle_analyze_csv,
         "get_generation_context": _handle_generation_context,
@@ -474,6 +495,31 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     if handler:
         return handler(arguments)
     return [TextContent(type="text", text=f"Unknown tool: {name}")]
+
+
+def _handle_identify(args: dict) -> list[TextContent]:
+    """Identify artifact type from CSV headers."""
+    csv_path = args["csv_path"]
+    if not Path(csv_path).exists():
+        return [TextContent(type="text", text=json.dumps({"error": f"CSV not found: {csv_path}"}))]
+
+    import csv as _csv
+    with open(csv_path, "r", encoding="utf-8-sig") as f:
+        headers = [h.strip() for h in next(_csv.reader(f))]
+
+    matches = _ontology.identify_artifact_from_headers(headers)
+
+    result = {
+        "csv_path": csv_path,
+        "column_count": len(headers),
+        "matches": matches,
+        "next_step": (
+            f"Top match: {matches[0]['artifact']} ({matches[0]['match_count']}/{matches[0]['total_common_fields']} fields matched). "
+            "Call resolve_artifact with this name to get CASE/UCO properties, "
+            "then analyze_csv + generate_all_rows."
+        ) if matches else "No artifact match found. Provide artifact name manually.",
+    }
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
 
 def _handle_resolve(args: dict) -> list[TextContent]:

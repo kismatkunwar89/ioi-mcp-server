@@ -554,3 +554,32 @@ class OntologyLoader:
 
         scored.sort(key=lambda x: -x["score"])
         return scored[:top_n]
+
+    def identify_artifact_from_headers(
+        self, headers: list[str], top_n: int = 3
+    ) -> list[dict]:
+        """
+        Identify the forensic artifact type from CSV column headers
+        by matching against common_fields in the forensics_wiki_index.
+
+        Returns ranked artifact matches with overlap count.
+        """
+        header_set = set(h.strip() for h in headers)
+        scores = []
+        for name, info in self._artifact_descriptions.items():
+            common = set(info.get("common_fields", []))
+            if not common:
+                continue
+            overlap = header_set & common
+            if overlap:
+                scores.append({
+                    "artifact": name,
+                    "full_name": info.get("full_name", name),
+                    "matched_fields": sorted(overlap),
+                    "match_count": len(overlap),
+                    "total_common_fields": len(common),
+                    "match_ratio": round(len(overlap) / len(common), 2),
+                    "description": info.get("description", "")[:150],
+                })
+        scores.sort(key=lambda x: -x["match_count"])
+        return scores[:top_n]
