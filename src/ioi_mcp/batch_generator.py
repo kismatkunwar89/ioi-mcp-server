@@ -296,8 +296,6 @@ def generate_all_rows(
                                 facet_node[prop["name"]] = serialized
                             break
 
-
-
                 # Only add facet if it has at least one property beyond @id/@type
                 if len(facet_node) > 2:
                     facets.append(facet_node)

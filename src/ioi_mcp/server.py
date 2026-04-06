@@ -597,14 +597,51 @@ def _handle_resolve(args: dict) -> list[TextContent]:
         }
 
         # Add ontology candidates if any scored above threshold
+        # Auto-expand top facet candidates with full property lists
+        # so the LLM can reason about column→property mapping in one call
         if candidates:
-            result["ontology_candidates"] = candidates
+            expanded = []
+            facets_expanded = 0
+            for cand in candidates:
+                if cand["type"] == "facet" and facets_expanded < 3:
+                    props = _ontology.get_facet_properties(cand["class"])
+                    cand["properties"] = [
+                        {
+                            "name": p["name"],
+                            "local_name": p["local_name"],
+                            "description": p.get("description", ""),
+                            "type": p["range"],
+                            "type_category": p["range_type"],
+                        }
+                        for p in props
+                    ]
+                    facets_expanded += 1
+                elif cand["type"] == "observable" and cand.get("facets"):
+                    # Expand facets of observable candidates too
+                    for f_info in cand["facets"]:
+                        if facets_expanded < 3 and f_info["property_count"] > 0:
+                            props = _ontology.get_facet_properties(f_info["facet"])
+                            f_info["properties"] = [
+                                {
+                                    "name": p["name"],
+                                    "local_name": p["local_name"],
+                                    "description": p.get("description", ""),
+                                    "type": p["range"],
+                                    "type_category": p["range_type"],
+                                }
+                                for p in props
+                            ]
+                            facets_expanded += 1
+                expanded.append(cand)
+
+            result["ontology_candidates"] = expanded
             result["candidates_note"] = (
                 "Possible CASE/UCO matches found via keyword search. "
-                "These are NOT auto-selected — review them and use "
-                "get_facet_properties to inspect before deciding. "
-                "If a candidate fits, use its class as @type and map "
-                "CSV columns to its Facet properties."
+                "Properties are listed with descriptions — use them to map "
+                "CSV columns to official CASE/UCO properties. Columns that "
+                "don't match any listed property become ioi-ext: extensions. "
+                "Include matched properties in your column_mapping when calling "
+                "generate_all_rows."
             )
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
