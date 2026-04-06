@@ -377,7 +377,32 @@ def generate_all_rows(
         with open(turtle_path, "w") as f:
             f.write(turtle_patch)
 
-    return {
+    # Build hint for official facets that were discovered but couldn't
+    # auto-match. Return their properties so the LLM can re-call with
+    # an explicit column_mapping to use them.
+    available_official_facets = {}
+    for facet_name in official_facets:
+        # Only include facets that weren't auto-matched (no columns went to them)
+        if facet_name in official_auto_match:
+            continue
+        facet_props = ontology.get_facet_properties(facet_name)
+        if not facet_props:
+            continue
+        # Skip object-only facets
+        datatype_props = [
+            {
+                "property": p["name"],
+                "local_name": p["local_name"],
+                "description": p.get("description", "")[:100],
+                "type": p["range"],
+            }
+            for p in facet_props
+            if p.get("range_type") != "object"
+        ]
+        if datatype_props:
+            available_official_facets[facet_name] = datatype_props
+
+    result = {
         "jsonld": jsonld,
         "jsonld_path": str(jsonld_path),
         "turtle_patch": turtle_patch,
@@ -386,6 +411,17 @@ def generate_all_rows(
         "mapped_columns": list(column_mapping.keys()),
         "unmapped_columns": [c["column_name"] for c in unmapped_cols],
     }
+
+    if available_official_facets:
+        result["available_official_facets"] = available_official_facets
+        result["mapping_hint"] = (
+            "Official CASE/UCO facets were found but could not auto-match "
+            "column names. Review the properties below and re-call with a "
+            "column_mapping to use official properties instead of ioi-ext. "
+            "Example: {'EntryNumber': 'uco-observable:mftFileID'}"
+        )
+
+    return result
 
 
 def _shape_from_type(xsd_type: str) -> str:
