@@ -243,6 +243,38 @@ def generate_all_rows(
     # Always include FileFacet and ContentDataFacet
     official_facets.extend(["FileFacet", "ContentDataFacet"])
 
+    # Pre-compute auto-match: for discovered official facets, match CSV
+    # columns to SHACL properties by exact name match (case-insensitive).
+    # Skips object properties (they need nested nodes, not flat CSV strings).
+    # Matched columns are removed from unmapped_props so they go to the
+    # official facet instead of ioi-ext.
+    official_auto_match = {}  # {facet_name: {csv_col: {prop_name, xsd_type, shape_hint}}}
+    for facet_name in official_facets:
+        facet_props = ontology.get_facet_properties(facet_name)
+        if not facet_props:
+            continue
+        auto = {}
+        for prop in facet_props:
+            if prop.get("range_type") == "object":
+                continue  # Skip hash, alternateDataStreams, etc.
+            prop_local = prop["local_name"]
+            for csv_col in list(unmapped_props.keys()):
+                col_clean = csv_col.replace(" ", "").lower()
+                if prop_local.lower() == col_clean:
+                    shacl_range = prop.get("range", "")
+                    xsd_type = col_types.get(csv_col, "xsd:string")
+                    if "xsd:" in str(shacl_range):
+                        xsd_type = str(shacl_range)
+                    auto[csv_col] = {
+                        "prop_name": prop["name"],
+                        "xsd_type": xsd_type,
+                        "shape_hint": _shape_from_type(xsd_type),
+                    }
+                    del unmapped_props[csv_col]
+                    break
+        if auto:
+            official_auto_match[facet_name] = auto
+
     ext_facet_name = _to_facet_name(artifact_name)
 
     # Read all CSV rows and generate graph
@@ -295,6 +327,16 @@ def generate_all_rows(
                             if serialized is not None:
                                 facet_node[prop["name"]] = serialized
                             break
+
+                # Add auto-matched columns
+                auto = official_auto_match.get(facet_name, {})
+                for csv_col, match_info in auto.items():
+                    val = row.get(csv_col, "")
+                    serialized = _serialize_value(
+                        val, match_info["xsd_type"], match_info["shape_hint"]
+                    )
+                    if serialized is not None:
+                        facet_node[match_info["prop_name"]] = serialized
 
                 # Only add facet if it has at least one property beyond @id/@type
                 if len(facet_node) > 2:
