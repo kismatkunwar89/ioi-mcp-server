@@ -419,18 +419,29 @@ class OntologyLoader:
             # Exact name match (highest signal)
             if artifact_name.lower() == class_name:
                 score += 100
-            # Artifact name is substring of class name
-            if artifact_name.lower() in class_name:
+            # Artifact name is substring of class name — but only at
+            # a word boundary (start of name or CamelCase segment).
+            # This prevents 'etw' matching inside 'nETWorkAppliance'
+            # while allowing 'mft' to match 'MftRecordFacet'.
+            art_lower = artifact_name.lower()
+            if art_lower in class_name and class_name.startswith(art_lower):
+                score += 50
+            elif art_lower in class_name and len(art_lower) >= 4:
                 score += 50
             # Class name is substring of artifact name (min length 4)
-            if class_name in artifact_name.lower() and len(class_name) > 3:
+            if class_name in art_lower and len(class_name) > 3:
                 score += 40
             # Token overlap between artifact name and class name
-            name_overlap = name_tokens & class_tokens
+            # Exclude overly generic tokens that match too broadly
+            generic_tokens = {"log", "logs", "windows", "system",
+                              "service", "process"}
+            name_overlap = (name_tokens & class_tokens) - generic_tokens
             if name_overlap:
                 score += len(name_overlap) * 20
             # Artifact name tokens found in labels/comments
             for t in name_tokens:
+                if t in generic_tokens:
+                    continue
                 if t in all_text and t not in class_tokens:
                     score += 10
             # Description tokens matching class name tokens
