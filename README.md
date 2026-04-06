@@ -35,7 +35,80 @@ The MCP server provides knowledge. Claude (or any MCP client) provides reasoning
 ## Installation
 
 ```bash
-pip install case-utils rdflib mcp
+git clone https://github.com/ioi-framework/ioi-mcp-server.git
+cd ioi-mcp-server
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install case-utils rdflib "mcp>=1.0.0"
+pip install -e .
+```
+
+Verify it works:
+
+```bash
+python -c "from ioi_mcp.ontology_loader import OntologyLoader; o = OntologyLoader(); print(f'Classes: {len(o._observable_index)}, Facets: {len(o._facet_index)}')"
+# Expected: Classes: 171, Facets: 149
+```
+
+## Claude Code Integration
+
+Add the server to Claude Code with one command:
+
+```bash
+claude mcp add ioi-mcp /path/to/ioi-mcp-server/.venv/bin/ioi-mcp
+```
+
+Replace `/path/to/ioi-mcp-server` with your actual clone path. Verify it registered:
+
+```bash
+claude mcp list
+```
+
+The server runs via stdio — no ports, no background process needed.
+
+## Claude Desktop / Cursor Integration
+
+Add to your MCP config (`~/.claude/claude_desktop_config.json` or `.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "ioi-mcp": {
+      "command": "/path/to/ioi-mcp-server/.venv/bin/ioi-mcp"
+    }
+  }
+}
+```
+
+Replace `/path/to/ioi-mcp-server` with your actual clone path.
+
+## Usage (programmatic)
+
+```python
+from ioi_mcp.ontology_loader import OntologyLoader
+from ioi_mcp.manifest import ManifestRegistry
+from ioi_mcp.graph_builder import GraphBuilder
+from ioi_mcp.validator import Validator
+
+ont = OntologyLoader()
+m = ManifestRegistry()
+builder = GraphBuilder(ont, m)
+validator = Validator(ont)
+
+# Generate JSON-LD from any forensic tool CSV
+result = builder.build_from_csv("SRUM", "path/to/srum.csv")
+
+# Validate (IRI + SHACL)
+v = validator.validate_jsonld(result["jsonld"], result.get("turtle_patch"))
+print("Valid:", v.valid)
+
+# Output files
+import json
+with open("srum.jsonld", "w") as f:
+    json.dump(result["jsonld"], f, indent=2)
+if result.get("turtle_patch"):
+    with open("srum_ext.ttl", "w") as f:
+        f.write(result["turtle_patch"])
 ```
 
 ## Contribution Alignment

@@ -6,6 +6,7 @@ Case-agnostic: validates any CASE/UCO JSON-LD regardless of artifact type.
 import json
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -250,7 +251,12 @@ class Validator:
                 json.dump(jsonld, f, indent=2)
                 jsonld_path = f.name
 
-            cmd = ["case_validate", jsonld_path]
+            # Resolve case_validate from the same venv as this process
+            bin_dir = Path(sys.executable).parent
+            case_validate_bin = bin_dir / "case_validate"
+            if not case_validate_bin.exists():
+                case_validate_bin = Path("case_validate")  # fall back to PATH
+            cmd = [str(case_validate_bin), jsonld_path]
 
             # Add extension ontology if present
             if turtle_patch:
