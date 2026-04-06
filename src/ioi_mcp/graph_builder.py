@@ -1,6 +1,6 @@
 """
 Graph builder — assembles complete, valid CASE/UCO JSON-LD documents.
-Case-agnostic: builds from manifest entries + ontology properties + extension facets.
+Case-agnostic: builds from ontology properties + extension facets.
 Every output has valid IRIs, UUIDs, and proper @context.
 """
 
@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Optional
 
 from ioi_mcp.ontology_loader import OntologyLoader
-from ioi_mcp.manifest import ManifestRegistry
 from ioi_mcp.type_inferencer import analyze_csv
 from ioi_mcp.extension_gen import (
     generate_turtle_patch,
@@ -151,7 +150,7 @@ def _safe_bool(val) -> bool:
 class GraphBuilder:
     """Builds complete CASE/UCO JSON-LD graphs."""
 
-    def __init__(self, ontology: OntologyLoader, manifest: ManifestRegistry):
+    def __init__(self, ontology: OntologyLoader, manifest=None):
         self.ontology = ontology
         self.manifest = manifest
 
@@ -165,7 +164,7 @@ class GraphBuilder:
         Build a JSON-LD graph for a known artifact (manifest hit).
         Returns complete graph with @context and @graph, or None if not found.
         """
-        entry = self.manifest.resolve(artifact_name)
+        entry = self.manifest.resolve(artifact_name) if self.manifest else None
         if not entry:
             return None
 
@@ -226,7 +225,7 @@ class GraphBuilder:
         """
         columns = analyze_csv(csv_path)
         sample_row = self._read_first_row(csv_path)
-        entry = self.manifest.resolve(artifact_name)
+        entry = self.manifest.resolve(artifact_name) if self.manifest else None
 
         context = dict(BASE_CONTEXT)
         uco_class = entry["uco_class"] if entry else "uco-observable:ObservableObject"
@@ -335,8 +334,8 @@ class GraphBuilder:
         # Read first data row for populating example
         sample_row = self._read_first_row(csv_path)
 
-        # Check manifest
-        entry = self.manifest.resolve(artifact_name)
+        # Check manifest (if available)
+        entry = self.manifest.resolve(artifact_name) if self.manifest else None
 
         if entry and entry.get("tier") == "official":
             # Known official artifact
