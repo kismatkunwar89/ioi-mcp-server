@@ -21,8 +21,11 @@ _UUID4_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Required context prefixes
-_REQUIRED_PREFIXES = {"kb", "uco-core", "uco-observable", "xsd"}
+# Required context prefixes — accept both long (uco-core) and short (core) forms
+_REQUIRED_PREFIXES_SETS = [
+    {"kb", "uco-core", "uco-observable", "xsd"},  # Long form
+    {"kb", "core", "observable", "xsd"},            # Short form (IOI Framework convention)
+]
 _EXTENSION_PREFIX = "ioi-ext"
 
 
@@ -103,9 +106,16 @@ class Validator:
         errors = []
         context = jsonld.get("@context", {})
 
-        for prefix in _REQUIRED_PREFIXES:
-            if prefix not in context:
-                errors.append(f"Missing required prefix '{prefix}' in @context")
+        # Accept either long-form (uco-core) or short-form (core) prefixes
+        valid = any(
+            all(p in context for p in prefix_set)
+            for prefix_set in _REQUIRED_PREFIXES_SETS
+        )
+        if not valid:
+            errors.append(
+                "@context must include either {kb, uco-core, uco-observable, xsd} "
+                "or {kb, core, observable, xsd}"
+            )
 
         # Check if ioi-ext is needed but missing
         jsonld_str = json.dumps(jsonld)
@@ -167,17 +177,37 @@ class Validator:
 
         return errors
 
+    # Map short prefixes to long prefixes for IRI validation
+    _PREFIX_ALIASES = {
+        "core:": "uco-core:",
+        "observable:": "uco-observable:",
+    }
+
+    def _normalize_prefix(self, prefixed: str) -> str:
+        """Normalize short-form prefix to long-form for ontology lookup."""
+        for short, long in self._PREFIX_ALIASES.items():
+            if prefixed.startswith(short):
+                return long + prefixed[len(short):]
+        return prefixed
+
     def _collect_type_errors(self, node: dict, errors: list[str]):
         """Recursively check @type values."""
         if not isinstance(node, dict):
             return
 
         node_type = node.get("@type", "")
-        if node_type and isinstance(node_type, str):
-            if ":" in node_type and not node_type.startswith("xsd:"):
-                valid, msg = self.ontology.validate_type_iri(node_type)
+        types_to_check = []
+        if isinstance(node_type, str):
+            types_to_check = [node_type]
+        elif isinstance(node_type, list):
+            types_to_check = [t for t in node_type if isinstance(t, str)]
+
+        for t in types_to_check:
+            if ":" in t and not t.startswith("xsd:"):
+                normalized = self._normalize_prefix(t)
+                valid, msg = self.ontology.validate_type_iri(normalized)
                 if not valid:
-                    errors.append(f"@type '{node_type}': {msg}")
+                    errors.append(f"@type '{t}': {msg}")
 
         for key, val in node.items():
             if isinstance(val, dict):
@@ -205,9 +235,10 @@ class Validator:
             if key.startswith("@"):
                 continue
 
-            # Check official UCO properties exist
-            if key.startswith("uco-"):
-                valid, msg = self.ontology.validate_type_iri(key)
+            # Check official UCO properties exist (both long and short prefix)
+            if key.startswith("uco-") or key.startswith("core:") or key.startswith("observable:"):
+                normalized = self._normalize_prefix(key)
+                valid, msg = self.ontology.validate_type_iri(normalized)
                 if not valid:
                     errors.append(f"Property '{key}': {msg}")
 

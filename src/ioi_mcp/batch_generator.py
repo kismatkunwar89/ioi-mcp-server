@@ -24,18 +24,13 @@ from ioi_mcp.extension_gen import (
 from ioi_mcp.type_inferencer import analyze_csv, infer_xsd_type
 
 
-# Standard @context
+# Standard @context — uses short prefix names (core:, observable:) to match
+# the IOI Framework convention used in CASES/ and RULES/
 BASE_CONTEXT = {
     "kb": "http://example.org/kb/",
-    "uco-core": "https://ontology.unifiedcyberontology.org/uco/core/",
-    "uco-observable": "https://ontology.unifiedcyberontology.org/uco/observable/",
-    "uco-types": "https://ontology.unifiedcyberontology.org/uco/types/",
-    "uco-vocabulary": "https://ontology.unifiedcyberontology.org/uco/vocabulary/",
+    "core": "https://ontology.unifiedcyberontology.org/uco/core/",
+    "observable": "https://ontology.unifiedcyberontology.org/uco/observable/",
     "uco-action": "https://ontology.unifiedcyberontology.org/uco/action/",
-    "uco-tool": "https://ontology.unifiedcyberontology.org/uco/tool/",
-    "uco-identity": "https://ontology.unifiedcyberontology.org/uco/identity/",
-    "uco-location": "https://ontology.unifiedcyberontology.org/uco/location/",
-    "case-investigation": "https://ontology.caseontology.org/case/investigation/",
     "ioi-ext": IOI_EXT_NS,
     "xsd": "http://www.w3.org/2001/XMLSchema#",
 }
@@ -144,7 +139,7 @@ def generate_all_rows(
         if ontology.observable_exists(c):
             uri = ontology.get_observable_uri(c)
             obs_name = uri.split("/")[-1] if uri else c
-            obs_class = f"uco-observable:{obs_name}"
+            obs_class = f"observable:{obs_name}"
             break
 
     # Keyword search fallback for observable class
@@ -160,11 +155,11 @@ def generate_all_rows(
         )
         for sr in search_results:
             if sr["type"] == "observable":
-                obs_class = f"uco-observable:{sr['class']}"
+                obs_class = f"observable:{sr['class']}"
                 break
 
     if not obs_class:
-        obs_class = "uco-observable:ObservableObject"
+        obs_class = "observable:ObservableObject"
 
     # Analyze CSV for column types
     columns = analyze_csv(csv_path)
@@ -180,7 +175,7 @@ def generate_all_rows(
         shape_hint = _shape_from_type(xsd_type)
 
         # Check SHACL for official type override
-        if uco_prop.startswith("uco-observable:") or uco_prop.startswith("uco-core:"):
+        if uco_prop.startswith("observable:") or uco_prop.startswith("core:") or uco_prop.startswith("uco-observable:") or uco_prop.startswith("uco-core:"):
             shacl_type = _get_shacl_type(ontology, local_name)
             if shacl_type:
                 xsd_type = shacl_type
@@ -304,7 +299,53 @@ def generate_all_rows(
         if auto:
             official_auto_match[facet_name] = auto
 
-    ext_facet_name = _to_facet_name(artifact_name)
+    # Auto-match curated ioi-ext.ttl properties by column name
+    # e.g. CSV "EntryNumber" → ioi-ext:entryNumber (from MftFacet in ioi-ext.ttl)
+    ext_auto_match = {}  # {csv_col: {prop_name, xsd_type, shape_hint}}
+    # Try multiple casing patterns: MFT→MftFacet, MFTFacet, WindowsMftFacet
+    art_title = artifact_name.capitalize()  # MFT → Mft, LNK → Lnk
+    for candidate_facet in [
+        f"{art_title}Facet",
+        f"Windows{art_title}Facet",
+        f"{artifact_name}Facet",
+        f"Windows{artifact_name}Facet",
+        _to_facet_name(artifact_name),
+    ]:
+        ext_props = ontology.get_ext_facet_properties(candidate_facet)
+        if not ext_props:
+            continue
+        for ep in ext_props:
+            ep_local = ep["name"].split(":")[-1]
+            for csv_col in list(unmapped_props.keys()):
+                col_clean = csv_col.replace(" ", "").lower()
+                if ep_local.lower() == col_clean:
+                    xsd_type = ep.get("range", "string")
+                    if not xsd_type.startswith("xsd:"):
+                        xsd_type = f"xsd:{xsd_type}"
+                    ext_auto_match[csv_col] = {
+                        "prop_name": ep["name"],
+                        "xsd_type": xsd_type,
+                        "shape_hint": _shape_from_type(xsd_type),
+                    }
+                    del unmapped_props[csv_col]
+                    break
+        break  # Use first matching facet
+
+    # Layer 0: Use curated ioi-ext.ttl facet name if it exists
+    # e.g. MFT → MftFacet (from ioi-ext.ttl), LNK → WindowsLnkFacet
+    ext_facet_name = None
+    for candidate in [
+        f"{art_title}Facet",
+        f"Windows{art_title}Facet",
+        f"{artifact_name}Facet",
+        f"Windows{artifact_name}Facet",
+        _to_facet_name(artifact_name),
+    ]:
+        if ontology.get_ext_facet_properties(candidate):
+            ext_facet_name = candidate
+            break
+    if not ext_facet_name:
+        ext_facet_name = _to_facet_name(artifact_name)
 
     # Read all CSV rows and generate graph
     context = dict(BASE_CONTEXT)
@@ -320,12 +361,19 @@ def generate_all_rows(
             # Build official facets
             facets = []
 
-            # Extension facet (unmapped columns)
-            if unmapped_props:
+            # Extension facet (curated ioi-ext.ttl props + unmapped columns)
+            if unmapped_props or ext_auto_match:
                 ext_facet = {
                     "@id": f"kb:{ext_facet_name.lower()}--{row_uuid}",
-                    "@type": [f"{IOI_EXT_PREFIX}:{ext_facet_name}", "uco-core:Facet"],
+                    "@type": [f"{IOI_EXT_PREFIX}:{ext_facet_name}", "core:Facet"],
                 }
+                # Curated ioi-ext.ttl properties first
+                for csv_col, match_info in ext_auto_match.items():
+                    val = row.get(csv_col, "")
+                    serialized = _serialize_value(val, match_info["xsd_type"], match_info["shape_hint"])
+                    if serialized is not None:
+                        ext_facet[match_info["prop_name"]] = serialized
+                # Remaining unmapped columns as auto-generated properties
                 for csv_col, prop_info in unmapped_props.items():
                     val = row.get(csv_col, "")
                     serialized = _serialize_value(val, prop_info["xsd_type"], prop_info["shape_hint"])
@@ -339,10 +387,10 @@ def generate_all_rows(
                 if not facet_props:
                     continue
 
-                facet_type = f"uco-observable:{facet_name}"
+                facet_type = f"observable:{facet_name}"
                 facet_node = {
                     "@id": f"kb:{facet_name.lower()}--{row_uuid}",
-                    "@type": [facet_type, "uco-core:Facet"],
+                    "@type": [facet_type, "core:Facet"],
                 }
 
                 for prop in facet_props:
@@ -375,7 +423,7 @@ def generate_all_rows(
             obs_node = {
                 "@id": f"kb:{entity_local}--{row_uuid}",
                 "@type": obs_class,
-                "uco-core:hasFacet": facets,
+                "core:hasFacet": facets,
             }
             graph_nodes.append(obs_node)
 
@@ -447,7 +495,7 @@ def generate_all_rows(
             "Official CASE/UCO facets were found but could not auto-match "
             "column names. Review the properties below and re-call with a "
             "column_mapping to use official properties instead of ioi-ext. "
-            "Example: {'EntryNumber': 'uco-observable:mftFileID'}"
+            "Example: {'EntryNumber': 'observable:mftFileID'}"
         )
 
     # Add semantically discovered facets (from property description matching)
