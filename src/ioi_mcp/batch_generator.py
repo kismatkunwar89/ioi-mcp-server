@@ -137,15 +137,31 @@ def generate_all_rows(
         }
     """
     # Resolve artifact (ontology-only, no manifest)
-    candidates = [artifact_name, f"Windows{artifact_name}", artifact_name.replace(" ", "")]
+    name_candidates = [artifact_name, f"Windows{artifact_name}", artifact_name.replace(" ", "")]
 
     obs_class = None
-    for c in candidates:
+    for c in name_candidates:
         if ontology.observable_exists(c):
             uri = ontology.get_observable_uri(c)
             obs_name = uri.split("/")[-1] if uri else c
             obs_class = f"uco-observable:{obs_name}"
             break
+
+    # Keyword search fallback for observable class
+    if not obs_class:
+        wiki_desc = ontology.get_artifact_description(artifact_name)
+        desc_text = ""
+        if isinstance(wiki_desc, dict):
+            desc_text = wiki_desc.get("description", "")
+        elif isinstance(wiki_desc, str):
+            desc_text = wiki_desc
+        search_results = ontology.search_candidates(
+            artifact_name, description=desc_text, threshold=40
+        )
+        for sr in search_results:
+            if sr["type"] == "observable":
+                obs_class = f"uco-observable:{sr['class']}"
+                break
 
     if not obs_class:
         obs_class = "uco-observable:ObservableObject"
@@ -191,12 +207,35 @@ def generate_all_rows(
 
     # Determine facets from ontology (no manifest)
     official_facets = []
-    # Check for matching facet by name convention
+    # Step 1: Check for matching facet by exact name convention
     for fc in [f"{artifact_name}Facet", f"Windows{artifact_name}Facet"]:
         if ontology.facet_exists(fc):
             uri = ontology.get_facet_uri(fc)
             official_facets.append(uri.split("/")[-1] if uri else fc)
             break
+    # Step 2: If no exact match, use keyword search to find facets
+    #   e.g. "MFT" -> finds MftRecordFacet via tokenized search
+    if not official_facets:
+        wiki_desc = ontology.get_artifact_description(artifact_name)
+        desc_text = ""
+        if isinstance(wiki_desc, dict):
+            desc_text = wiki_desc.get("description", "")
+        elif isinstance(wiki_desc, str):
+            desc_text = wiki_desc
+        candidates = ontology.search_candidates(
+            artifact_name, description=desc_text, threshold=25
+        )
+        for cand in candidates:
+            if cand["type"] == "facet":
+                facet_local = cand["class"]
+                if ontology.facet_exists(facet_local):
+                    official_facets.append(facet_local)
+                    break
+            elif cand.get("facets"):
+                for f_info in cand["facets"]:
+                    if f_info["property_count"] > 0:
+                        official_facets.append(f_info["facet"])
+                break  # Use first observable candidate's facets
     # Also check ioi-ext facets
     ext_facet_key = _to_facet_name(artifact_name).replace("Facet", "") + "Facet"
     if ontology.get_ext_facet_properties(ext_facet_key):
@@ -204,9 +243,6 @@ def generate_all_rows(
     # Always include FileFacet and ContentDataFacet
     official_facets.extend(["FileFacet", "ContentDataFacet"])
 
-    # Group mapped properties by their target facet
-    # For now: all mapped props go into the appropriate official facet
-    # All unmapped go into the extension facet
     ext_facet_name = _to_facet_name(artifact_name)
 
     # Read all CSV rows and generate graph
@@ -249,7 +285,7 @@ def generate_all_rows(
                 }
 
                 for prop in facet_props:
-                    # Find if any mapped column targets this property
+                    # Check if any explicitly mapped column targets this property
                     for csv_col, prop_info in mapped_props.items():
                         if prop_info["prefixed"] == prop["name"]:
                             val = row.get(csv_col, "")
@@ -259,6 +295,8 @@ def generate_all_rows(
                             if serialized is not None:
                                 facet_node[prop["name"]] = serialized
                             break
+
+
 
                 # Only add facet if it has at least one property beyond @id/@type
                 if len(facet_node) > 2:
