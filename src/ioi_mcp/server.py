@@ -2,19 +2,28 @@
 IOI Framework MCP Server
 Scalable, case-agnostic CASE/UCO JSON-LD artifact graph generator.
 
-Tools:
-  resolve_artifact    — Rich context: ontology + ioi-ext properties with descriptions
-  analyze_csv         — CSV column analysis: headers, sample values, inferred types
-  generate_graph      — Build JSON-LD from CSV + LLM-provided column mapping
-  generate_from_csv   — Auto-generate (no mapping needed, for extension artifacts)
-  get_facet_properties — SHACL property extraction for any Facet
-  validate_graph      — Full IRI + SHACL validation
+Tools (11 total):
+  Core generation:
+    resolve_artifact      — Rich context: ontology + ioi-ext properties with descriptions
+    analyze_csv           — CSV column analysis: headers, sample values, inferred types
+    get_generation_context — Full constraints for LLM-driven JSON-LD generation
+    generate_from_csv     — Auto-generate (no mapping needed, for extension artifacts)
+    get_facet_properties  — SHACL property extraction for any Facet
+    generate_all_rows     — Deterministic batch: one ObservableObject per CSV row
+    validate_graph        — Full IRI + SHACL validation
+
+  Contribution workflow:
+    scaffold_case         — Assemble CASES/AF-NEW/ directory for a PR
+    draft_sparql_context  — Extract property IRIs from graphs for SPARQL rule writing
+    generate_test_graph   — Synthetic test graph with specific values
+    test_rule             — Execute SPARQL .rq against rdflib Dataset (no Virtuoso)
 
 Flow:
   1. Claude calls resolve_artifact → gets SHACL properties with rdfs:comment descriptions
   2. Claude calls analyze_csv → gets CSV headers with sample values and inferred types
   3. Claude reasons the mapping (CSV column → CASE/UCO property) using both contexts
-  4. Claude calls generate_graph with the mapping → MCP builds validated JSON-LD
+  4. Claude calls generate_all_rows with the mapping → MCP builds validated JSON-LD
+  5. (Optional) scaffold_case → package for PR, draft_sparql_context → write rules, test_rule → verify
 """
 
 import json
@@ -252,6 +261,187 @@ async def list_tools() -> list[Tool]:
                     },
                 },
                 "required": ["jsonld_path"],
+            },
+        ),
+        # ─── Contribution workflow tools ──────────────────────────
+        Tool(
+            name="scaffold_case",
+            description=(
+                "Assemble a complete CASES/AF-NEW/ directory structure for an IoI contribution PR. "
+                "Generates: ground_truth.md, mapping.md, README.md, JSON-LD snippets, test graph stubs, "
+                "and Jekyll front-matter stubs for the docs site. Requires pre-generated graphs from "
+                "generate_all_rows. Use this AFTER generating graphs to package everything for submission."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Base directory (e.g., path to the ioi-framework repo clone)",
+                    },
+                    "case_id": {
+                        "type": "string",
+                        "description": "Case identifier, e.g. 'AF-NEW' (placeholder, maintainers finalize)",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Human-readable title, e.g. 'Timestomping Detection via Prefetch Analysis'",
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "Plain English description of the anti-forensic technique and detection approach",
+                    },
+                    "artifacts": {
+                        "type": "array",
+                        "description": (
+                            "List of artifact objects, each with: "
+                            "'name' (str), 'graph_path' (str, path to .jsonld), "
+                            "'turtle_path' (str, optional path to ext .ttl), "
+                            "'column_mapping' (object, CSV col → property), "
+                            "'csv_path' (str, path to source CSV)"
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "graph_path": {"type": "string"},
+                                "turtle_path": {"type": "string"},
+                                "column_mapping": {"type": "object"},
+                                "csv_path": {"type": "string"},
+                            },
+                            "required": ["name", "graph_path", "column_mapping", "csv_path"],
+                        },
+                    },
+                    "contributor": {
+                        "type": "string",
+                        "description": "GitHub handle of the contributor",
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "IoI category: 'temporal', 'structural', or 'semantic'",
+                        "enum": ["temporal", "structural", "semantic"],
+                    },
+                    "inconsistency_description": {
+                        "type": "string",
+                        "description": "Description of the contradiction/inconsistency this case detects",
+                    },
+                },
+                "required": ["output_dir", "title", "summary", "artifacts"],
+            },
+        ),
+        Tool(
+            name="draft_sparql_context",
+            description=(
+                "Extract property IRIs from JSON-LD graphs and return structured context "
+                "for writing SPARQL IoI detection rules. Returns: all prefixes, types used, "
+                "properties with sample values per graph, join candidates (properties in multiple graphs), "
+                "and a skeleton SPARQL template. Use this BEFORE writing a SPARQL rule to understand "
+                "what properties are available and how to join across artifact graphs."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "graphs": {
+                        "type": "array",
+                        "description": (
+                            "List of graph objects, each with: "
+                            "'name' (str, e.g. 'MFT'), 'graph_path' (str, path to .jsonld), "
+                            "'graph_iri' (str, optional, e.g. 'http://example.org/mft_caseN')"
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "graph_path": {"type": "string"},
+                                "graph_iri": {"type": "string"},
+                            },
+                            "required": ["name", "graph_path"],
+                        },
+                    },
+                    "contradiction_description": {
+                        "type": "string",
+                        "description": "What the SPARQL rule should detect (the contradiction)",
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "IoI category: 'temporal', 'structural', or 'semantic'",
+                        "enum": ["temporal", "structural", "semantic"],
+                    },
+                },
+                "required": ["graphs"],
+            },
+        ),
+        Tool(
+            name="generate_test_graph",
+            description=(
+                "Generate a minimal synthetic JSON-LD test graph with specific values "
+                "designed to make a SPARQL rule fire (or not fire, for negative tests). "
+                "Use this to create controlled test data for SPARQL rule validation "
+                "without needing real forensic CSVs."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "artifact_name": {
+                        "type": "string",
+                        "description": "Artifact name, e.g. 'MFT', 'Prefetch'",
+                    },
+                    "graph_iri": {
+                        "type": "string",
+                        "description": "Named graph IRI, e.g. 'http://example.org/mft_test'",
+                    },
+                    "synthetic_values": {
+                        "type": "object",
+                        "description": (
+                            "Object with: 'facet_type' (str, e.g. 'ioi-ext:MftFacet'), "
+                            "'entity_type' (str, e.g. 'observable:File'), "
+                            "'properties' (object mapping property IRIs to typed values like "
+                            "{'@type': 'xsd:dateTime', '@value': '2025-02-16T10:15:00'}), "
+                            "'extra_facets' (array, optional additional facets)"
+                        ),
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Where to save the .jsonld file (defaults to /tmp/)",
+                    },
+                },
+                "required": ["artifact_name", "graph_iri", "synthetic_values"],
+            },
+        ),
+        Tool(
+            name="test_rule",
+            description=(
+                "Load JSON-LD graphs into an rdflib Dataset as named graphs and execute "
+                "a SPARQL .rq rule file against them. Returns: rows matched, column names, values, "
+                "and whether the rule 'fired' (found contradictions). Pure rdflib — no Virtuoso needed. "
+                "Supports named GRAPH queries, cross-graph JOINs, FILTER, OPTIONAL, BIND, VALUES. "
+                "Does NOT support bif: functions (Virtuoso-specific)."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "rule_path": {
+                        "type": "string",
+                        "description": "Path to the .rq SPARQL rule file",
+                    },
+                    "graphs": {
+                        "type": "array",
+                        "description": (
+                            "List of graph objects, each with: "
+                            "'graph_iri' (str, the named graph IRI matching the SPARQL GRAPH clause), "
+                            "'graph_path' (str, path to the .jsonld file)"
+                        ),
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "graph_iri": {"type": "string"},
+                                "graph_path": {"type": "string"},
+                            },
+                            "required": ["graph_iri", "graph_path"],
+                        },
+                    },
+                },
+                "required": ["rule_path", "graphs"],
             },
         ),
     ]

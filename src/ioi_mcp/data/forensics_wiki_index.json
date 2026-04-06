@@ -461,5 +461,720 @@
       "SnapshotAttributes"
     ],
     "forensic_significance": "VSS infrastructure files persist after shadow copy deletion. Absence of GUID directories when infrastructure exists indicates deliberate deletion (AF-004 IoI pattern)."
+  },
+  "WindowsRegistry": {
+    "full_name": "Windows Registry Hives",
+    "description": "The Windows Registry is a hierarchical database storing OS and application configuration. Key hives: SAM (user accounts), SECURITY (security policies), SOFTWARE (installed software), SYSTEM (hardware/services config), NTUSER.DAT (per-user settings), UsrClass.dat (per-user shell settings).",
+    "location": "C:\\Windows\\System32\\config\\ (SAM, SECURITY, SOFTWARE, SYSTEM); C:\\Users\\*\\NTUSER.DAT; C:\\Users\\*\\AppData\\Local\\Microsoft\\Windows\\UsrClass.dat",
+    "url": "https://forensics.wiki/windows_registry/",
+    "common_tools": [
+      "RECmd",
+      "RegRipper",
+      "Registry Explorer"
+    ],
+    "common_fields": [
+      "HivePath",
+      "KeyPath",
+      "ValueName",
+      "ValueType",
+      "ValueData",
+      "LastWriteTime"
+    ],
+    "forensic_significance": "Central configuration store. MRU lists, USB history, network connections, installed software, user activity, and persistence mechanisms all stored in registry."
+  },
+  "OpenSaveMRU": {
+    "full_name": "Windows OpenSaveMRU Registry Keys",
+    "description": "Records files opened or saved via Windows common dialog boxes. Tracks file extensions and full paths of recently accessed files per user.",
+    "location": "NTUSER.DAT\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSavePidlMRU",
+    "url": "https://forensics.wiki/opensavemru/",
+    "common_tools": [
+      "RECmd",
+      "RegRipper"
+    ],
+    "common_fields": [
+      "Extension",
+      "FilePath",
+      "LastWriteTime",
+      "MRUPosition"
+    ],
+    "forensic_significance": "Proves user interacted with specific files through Open/Save dialogs, even if files are deleted."
+  },
+  "MRULocations": {
+    "full_name": "Windows Most Recently Used (MRU) Locations",
+    "description": "Various registry locations that track recently accessed files, folders, commands, and typed URLs. Includes RecentDocs, RunMRU, TypedPaths, TypedURLs, and application-specific MRU lists.",
+    "location": "NTUSER.DAT\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\*MRU*",
+    "url": "https://forensics.wiki/list_of_windows_mru_locations/",
+    "common_tools": [
+      "RECmd",
+      "RegRipper"
+    ],
+    "common_fields": [
+      "MRUKey",
+      "MRUValue",
+      "LastWriteTime"
+    ],
+    "forensic_significance": "Comprehensive user activity tracking across multiple interaction types."
+  },
+  "SCCM": {
+    "full_name": "System Center Configuration Manager",
+    "description": "SCCM/MECM tracks software inventory, deployment history, and execution logs. The RecentlyUsedApps WMI class logs application usage with timestamps.",
+    "location": "WMI: root\\ccm\\Policy; C:\\Windows\\CCM\\Logs\\",
+    "url": "https://forensics.wiki/sccm/",
+    "common_tools": [
+      "WMI Explorer",
+      "CCM_RUA_Finder"
+    ],
+    "common_fields": [
+      "ProductName",
+      "ProductVersion",
+      "ExplorerFileName",
+      "LastUsedTime",
+      "LaunchCount"
+    ],
+    "forensic_significance": "Enterprise-managed systems retain execution history through SCCM even when local artifacts are cleared."
+  },
+  "Superfetch": {
+    "full_name": "Windows SuperFetch/SysMain",
+    "description": "SuperFetch (renamed SysMain in Windows 10) preloads frequently used applications. AgAppLaunch.db tracks application launch history with timestamps.",
+    "location": "C:\\Windows\\Prefetch\\Ag*.db",
+    "url": "https://forensics.wiki/superfetch/",
+    "common_tools": [
+      "CrowdStrike SuperFetch parser"
+    ],
+    "common_fields": [
+      "ExecutableName",
+      "LaunchTime",
+      "LaunchCount"
+    ],
+    "forensic_significance": "Provides execution evidence independent of Prefetch .pf files."
+  },
+  "RecentFileCache": {
+    "full_name": "RecentFileCache.bcf",
+    "description": "Windows 7 artifact that records recently executed files. Replaced by Amcache in Windows 8+. Contains file paths of executed binaries.",
+    "location": "C:\\Windows\\AppCompat\\Programs\\RecentFileCache.bcf",
+    "url": "https://forensics.wiki/recentfilecache.bcf/",
+    "common_tools": [
+      "RecentFileCacheParser"
+    ],
+    "common_fields": [
+      "FilePath"
+    ],
+    "forensic_significance": "Windows 7 execution artifact. Simple file path list without timestamps."
+  },
+  "RDPBitmapCache": {
+    "full_name": "RDP Bitmap Cache",
+    "description": "Remote Desktop Protocol caches screen fragments as bitmap tiles in bcache*.bmc files. These tiles can be reassembled to reconstruct what the user saw during RDP sessions.",
+    "location": "C:\\Users\\*\\AppData\\Local\\Microsoft\\Terminal Server Client\\Cache\\bcache*.bmc",
+    "url": "https://forensics.wiki/rdp_bitmap_cache/",
+    "common_tools": [
+      "bmc-tools",
+      "RDP Bitmap Cache Parser"
+    ],
+    "common_fields": [
+      "CacheFile",
+      "TileWidth",
+      "TileHeight",
+      "BitmapData"
+    ],
+    "forensic_significance": "Visual evidence of remote sessions even after connection logs are cleared."
+  },
+  "WindowsFileHistory": {
+    "full_name": "Windows File History",
+    "description": "Windows File History backs up user files periodically. The Configuration directory contains EDB catalogs tracking backed-up files, paths, and timestamps.",
+    "location": "C:\\Users\\*\\AppData\\Local\\Microsoft\\Windows\\FileHistory\\",
+    "url": "https://forensics.wiki/windows_file_history/",
+    "common_tools": [
+      "Autopsy",
+      "FileHistoryParser"
+    ],
+    "common_fields": [
+      "FileName",
+      "FilePath",
+      "BackupTime",
+      "FileSize"
+    ],
+    "forensic_significance": "Prior versions of files may exist in File History even after deletion or modification."
+  },
+  "WindowsSearch": {
+    "full_name": "Windows Search Index (Windows.edb)",
+    "description": "Windows Search indexes file content and metadata in an ESE database. Contains file paths, timestamps, content snippets, email subjects, and other searchable properties.",
+    "location": "C:\\ProgramData\\Microsoft\\Search\\Data\\Applications\\Windows\\Windows.edb",
+    "url": "https://forensics.wiki/windows_desktop_search/",
+    "common_tools": [
+      "WinSearchDBAnalyzer",
+      "ESEDatabaseView"
+    ],
+    "common_fields": [
+      "WorkId",
+      "FileName",
+      "Path",
+      "DateModified",
+      "DateCreated",
+      "ContentSnippet"
+    ],
+    "forensic_significance": "Contains indexed content of deleted files. Email content, document text, and metadata survive file deletion."
+  },
+  "NetworkConnections": {
+    "full_name": "Windows Network Connection Artifacts",
+    "description": "Windows tracks network connections through multiple artifacts: WLAN AutoConfig logs, NetworkList registry keys, SRUM network data, and TCP/IP parameters.",
+    "location": "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\NetworkList\\; SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\",
+    "url": "https://forensics.wiki/network_connections/",
+    "common_tools": [
+      "RECmd",
+      "RegRipper",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "ProfileName",
+      "SSID",
+      "NetworkType",
+      "FirstConnected",
+      "LastConnected",
+      "DefaultGateway",
+      "DNSServer"
+    ],
+    "forensic_significance": "Network profile history reveals geographic and temporal connection patterns."
+  },
+  "BitLocker": {
+    "full_name": "BitLocker Disk Encryption",
+    "description": "BitLocker encrypts entire volumes using AES. Recovery keys, encryption metadata, and TPM state are tracked in registry and BCD store.",
+    "location": "BCD store; SYSTEM registry; Recovery key file",
+    "url": "https://forensics.wiki/bitlocker_disk_encryption/",
+    "common_tools": [
+      "manage-bde",
+      "Dislocker",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "VolumeID",
+      "EncryptionMethod",
+      "ProtectorType",
+      "RecoveryKey"
+    ],
+    "forensic_significance": "Encrypted volumes require recovery keys for forensic access. Key protector metadata reveals encryption timeline."
+  },
+  "EFS": {
+    "full_name": "Windows Encrypting File System",
+    "description": "EFS encrypts individual files and folders using per-file encryption keys (FEK) wrapped with user certificates. EFS metadata is stored in NTFS alternate data streams.",
+    "location": "NTFS $EFS ADS; Certificate store",
+    "url": "https://forensics.wiki/windows_encrypted_file_system/",
+    "common_tools": [
+      "cipher.exe",
+      "EFSDump"
+    ],
+    "common_fields": [
+      "EncryptedFile",
+      "CertificateThumbprint",
+      "UserSID"
+    ],
+    "forensic_significance": "EFS-encrypted files require user certificate or recovery agent for decryption."
+  },
+  "CCleaner": {
+    "full_name": "CCleaner",
+    "description": "CCleaner is a system cleaning tool that removes temporary files, browser history, cookies, and other artifacts. Its own log and INI file record what was cleaned and when.",
+    "location": "C:\\Program Files\\CCleaner\\; C:\\Users\\*\\AppData\\Local\\CCleaner\\",
+    "url": "https://forensics.wiki/ccleaner/",
+    "common_tools": [
+      "CCleaner log parser"
+    ],
+    "common_fields": [
+      "CleanDate",
+      "ItemsCleaned",
+      "SpaceRecovered"
+    ],
+    "forensic_significance": "CCleaner's own artifacts (MRU, ini settings) reveal what was targeted for deletion and when."
+  },
+  "ScheduledTasks": {
+    "full_name": "Windows Scheduled Tasks",
+    "description": "Scheduled Tasks are stored as XML files defining trigger conditions, actions, and execution history. Task Scheduler operational log records execution timestamps.",
+    "location": "C:\\Windows\\System32\\Tasks\\; C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-TaskScheduler%4Operational.evtx",
+    "url": "https://forensics.wiki/windows_job_file_format/",
+    "common_tools": [
+      "Autopsy",
+      "schtasks.exe"
+    ],
+    "common_fields": [
+      "TaskName",
+      "TaskPath",
+      "Triggers",
+      "Actions",
+      "Author",
+      "CreationDate",
+      "LastRunTime",
+      "NextRunTime"
+    ],
+    "forensic_significance": "Persistence mechanism (T1053). Scheduled tasks survive reboots and can execute arbitrary commands."
+  },
+  "ETW": {
+    "full_name": "Event Tracing for Windows (ETW/ETL)",
+    "description": "ETW is a kernel-level tracing framework. ETL trace files contain detailed provider-specific events. Used by Windows Defender, .NET runtime, networking stack, and many system components.",
+    "location": "C:\\Windows\\System32\\LogFiles\\WMI\\; Various .etl files",
+    "url": "https://forensics.wiki/etw/",
+    "common_tools": [
+      "tracerpt.exe",
+      "ETLParser",
+      "SilkETW"
+    ],
+    "common_fields": [
+      "ProviderName",
+      "EventId",
+      "Timestamp",
+      "ProcessId",
+      "Payload"
+    ],
+    "forensic_significance": "Low-level kernel events often survive clearing of standard event logs."
+  },
+  "SetupAPILogs": {
+    "full_name": "Windows Setup API Logs",
+    "description": "Setup API logs record device installation and driver loading events. setupapi.dev.log tracks USB and other device connections with timestamps.",
+    "location": "C:\\Windows\\INF\\setupapi.dev.log",
+    "url": "https://forensics.wiki/setup_api_logs/",
+    "common_tools": [
+      "USB Forensic Tracker",
+      "Text editor"
+    ],
+    "common_fields": [
+      "DeviceDescription",
+      "DriverDate",
+      "InstallDate",
+      "DeviceInstanceId"
+    ],
+    "forensic_significance": "First-connection timestamps for USB devices. Survives registry clearing."
+  },
+  "PowerShellLogs": {
+    "full_name": "PowerShell Logging Artifacts",
+    "description": "PowerShell generates multiple log sources: ScriptBlock logging (Event 4104), Module logging, Transcription logs, and PSReadLine ConsoleHost_history.txt. Each captures different aspects of PowerShell execution.",
+    "location": "Microsoft-Windows-PowerShell%4Operational.evtx; C:\\Users\\*\\AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt",
+    "url": "https://forensics.wiki/powershell/",
+    "common_tools": [
+      "EvtxECmd",
+      "Get-WinEvent"
+    ],
+    "common_fields": [
+      "ScriptBlockText",
+      "CommandLine",
+      "HostApplication",
+      "Timestamp",
+      "UserId"
+    ],
+    "forensic_significance": "Full command history and script content. PSReadLine history persists across sessions and survives event log clearing."
+  },
+  "CLFS": {
+    "full_name": "Common Log File System",
+    "description": "CLFS is a kernel logging subsystem used by Windows for transactional operations. BLF files contain log metadata; container files hold actual log records. Used by TxF/TxR transactional NTFS.",
+    "location": "C:\\Windows\\System32\\config\\*.blf; Various .blf files",
+    "url": "https://forensics.wiki/common_log_file_system_(clfs)/",
+    "common_tools": [
+      "CLFS parser"
+    ],
+    "common_fields": [
+      "LogFile",
+      "ContainerPath",
+      "SequenceNumber",
+      "RecordData"
+    ],
+    "forensic_significance": "CLFS vulnerabilities (CVE-2023-23376 etc.) are actively exploited. Log records can reveal transactional operations."
+  },
+  "LinuxLogs": {
+    "full_name": "Linux System Logs",
+    "description": "Linux logs include auth.log (authentication events), syslog (system events), kern.log (kernel messages), and systemd journal. Log rotation preserves historical entries.",
+    "location": "/var/log/auth.log; /var/log/syslog; /var/log/kern.log; /var/log/journal/",
+    "url": "https://forensics.wiki/linux_logs_analysis/",
+    "common_tools": [
+      "journalctl",
+      "grep",
+      "Plaso"
+    ],
+    "common_fields": [
+      "Timestamp",
+      "Hostname",
+      "Service",
+      "PID",
+      "Message",
+      "Facility",
+      "Severity"
+    ],
+    "forensic_significance": "Authentication attempts, sudo usage, service starts/stops, kernel events. auth.log is critical for login tracking."
+  },
+  "BashHistory": {
+    "full_name": "Unix Shell History Files",
+    "description": "Shell history files record commands executed by users. .bash_history, .zsh_history, .sh_history preserve command sequences. Some shells support timestamps (HISTTIMEFORMAT).",
+    "location": "~/.bash_history; ~/.zsh_history; ~/.sh_history",
+    "url": "https://forensics.wiki/bash_shell/",
+    "common_tools": [
+      "Text editor",
+      "Plaso"
+    ],
+    "common_fields": [
+      "Command",
+      "Timestamp"
+    ],
+    "forensic_significance": "Direct evidence of commands executed by a user. May include passwords, IP addresses, and file operations."
+  },
+  "Crontab": {
+    "full_name": "Unix Cron Jobs",
+    "description": "Cron jobs schedule recurring tasks. User crontabs, system crontabs, and cron.d entries define scheduled commands with timing specifications.",
+    "location": "/var/spool/cron/crontabs/*; /etc/crontab; /etc/cron.d/; /etc/cron.{daily,weekly,monthly}/",
+    "url": "https://forensics.wiki/cron/",
+    "common_tools": [
+      "crontab -l",
+      "Text editor"
+    ],
+    "common_fields": [
+      "Schedule",
+      "User",
+      "Command"
+    ],
+    "forensic_significance": "Persistence mechanism on Linux/macOS. Adversaries use cron for recurring execution (T1053.003)."
+  },
+  "ExtFilesystem": {
+    "full_name": "Extended File System (ext2/ext3/ext4)",
+    "description": "The ext family of filesystems is the default for most Linux distributions. ext4 supports journaling, extents, and nanosecond timestamps. Inode metadata includes creation time (crtime) in ext4.",
+    "location": "Linux filesystem partitions",
+    "url": "https://forensics.wiki/extended_file_system_(ext)/",
+    "common_tools": [
+      "The Sleuth Kit",
+      "debugfs",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "InodeNumber",
+      "FileType",
+      "Permissions",
+      "Owner",
+      "Group",
+      "Size",
+      "AccessTime",
+      "ModifyTime",
+      "ChangeTime",
+      "CreationTime",
+      "BlockCount"
+    ],
+    "forensic_significance": "ext4 crtime (birth time) is immutable, analogous to NTFS $FN timestamps for timestomping detection."
+  },
+  "MacOSFSEvents": {
+    "full_name": "macOS FSEvents",
+    "description": "FSEvents logs record file system changes at the volume level. Stored as gzip-compressed binary files, they track file/folder creation, modification, deletion, and permission changes.",
+    "location": "/.fseventsd/",
+    "url": "https://forensics.wiki/mac_os_x/",
+    "common_tools": [
+      "FSEventsParser",
+      "mac_apt"
+    ],
+    "common_fields": [
+      "EventId",
+      "Path",
+      "Flags",
+      "NodeId"
+    ],
+    "forensic_significance": "Comprehensive filesystem change log. Events persist across reboots and are difficult to selectively manipulate."
+  },
+  "MacOSUnifiedLogs": {
+    "full_name": "macOS Unified Logging",
+    "description": "Apple's unified logging system (os_log) captures system, application, and user events. Stored in tracev3 format with structured predicates and subsystem categorization.",
+    "location": "/var/db/diagnostics/; /var/db/uuidtext/",
+    "url": "https://forensics.wiki/mac_os_x/",
+    "common_tools": [
+      "log show",
+      "UnifiedLogReader",
+      "mac_apt"
+    ],
+    "common_fields": [
+      "Timestamp",
+      "ProcessName",
+      "PID",
+      "Subsystem",
+      "Category",
+      "Message"
+    ],
+    "forensic_significance": "Extremely detailed system activity log. Process execution, network activity, and user actions all recorded."
+  },
+  "MacOSPlist": {
+    "full_name": "macOS Property List Files",
+    "description": "Plist files store configuration and state data in XML or binary format. LaunchAgents/LaunchDaemons define persistence. Application preferences, recent items, and system configuration stored as plists.",
+    "location": "/Library/LaunchAgents/; /Library/LaunchDaemons/; ~/Library/Preferences/; ~/Library/LaunchAgents/",
+    "url": "https://forensics.wiki/property_list_(plist)/",
+    "common_tools": [
+      "plutil",
+      "plistutil",
+      "mac_apt"
+    ],
+    "common_fields": [
+      "Key",
+      "Value",
+      "Type"
+    ],
+    "forensic_significance": "LaunchAgents/LaunchDaemons are primary macOS persistence mechanism (T1543.001). Application preferences reveal usage patterns."
+  },
+  "MacOSQuarantine": {
+    "full_name": "macOS Quarantine Events (com.apple.quarantine)",
+    "description": "macOS tracks downloaded files via the com.apple.quarantine extended attribute and the QuarantineEventsV2 SQLite database. Records download URL, timestamp, and downloading application.",
+    "location": "~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2",
+    "url": "https://forensics.wiki/mac_os_x/",
+    "common_tools": [
+      "sqlite3",
+      "mac_apt"
+    ],
+    "common_fields": [
+      "LSQuarantineEventIdentifier",
+      "LSQuarantineTimeStamp",
+      "LSQuarantineAgentBundleIdentifier",
+      "LSQuarantineAgentName",
+      "LSQuarantineDataURLString",
+      "LSQuarantineOriginURLString"
+    ],
+    "forensic_significance": "Proves file download history including source URL and downloading application, even after file deletion."
+  },
+  "MacOSKnowledgeC": {
+    "full_name": "macOS KnowledgeC.db",
+    "description": "KnowledgeC.db tracks user activity including application usage, device state, media playback, and Safari browsing. Apple's Siri Suggestions and Screen Time use this data.",
+    "location": "~/Library/Application Support/Knowledge/knowledgeC.db; /var/db/CoreDuet/Knowledge/knowledgeC.db",
+    "url": "https://forensics.wiki/mac_os_x/",
+    "common_tools": [
+      "APOLLO",
+      "mac_apt",
+      "sqlite3"
+    ],
+    "common_fields": [
+      "ZOBJECT_ZSTREAMNAME",
+      "ZSTARTDATE",
+      "ZENDDATE",
+      "ZVALUESTRING",
+      "ZBUNDLEID"
+    ],
+    "forensic_significance": "Comprehensive user activity timeline. Application focus time, device lock/unlock, and media interactions."
+  },
+  "SpotlightDB": {
+    "full_name": "macOS Spotlight Metadata",
+    "description": "Spotlight indexes file content and metadata for search. The store.db and .store.db files contain indexed file paths, content types, modification dates, and content snippets.",
+    "location": "/.Spotlight-V100/; ~/Library/Metadata/CoreSpotlight/",
+    "url": "https://forensics.wiki/spotlight_database_file_format/",
+    "common_tools": [
+      "spotlight_parser",
+      "mac_apt",
+      "mdls"
+    ],
+    "common_fields": [
+      "kMDItemPath",
+      "kMDItemContentType",
+      "kMDItemContentModificationDate",
+      "kMDItemDisplayName"
+    ],
+    "forensic_significance": "Contains metadata of deleted files. Indexed content persists after file removal."
+  },
+  "iOSKeychain": {
+    "full_name": "iOS Keychain",
+    "description": "iOS Keychain stores passwords, certificates, encryption keys, and secure notes in an encrypted SQLite database. Protected by hardware-bound keys and user passcode.",
+    "location": "keychain-2.db (in iOS backup or filesystem extraction)",
+    "url": "https://forensics.wiki/apple_iphone/",
+    "common_tools": [
+      "iLEAPP",
+      "APOLLO",
+      "Elcomsoft"
+    ],
+    "common_fields": [
+      "ServiceName",
+      "AccountName",
+      "Data",
+      "CreationDate",
+      "ModificationDate",
+      "AccessGroup"
+    ],
+    "forensic_significance": "Stored passwords, WiFi credentials, and app tokens. Requires device passcode or BFU/AFU extraction."
+  },
+  "AndroidSQLite": {
+    "full_name": "Android Application SQLite Databases",
+    "description": "Android apps store data in SQLite databases. Key databases include contacts2.db, mmssms.db, calllog.db, and app-specific databases for WhatsApp, Signal, Telegram, etc.",
+    "location": "/data/data/{package_name}/databases/",
+    "url": "https://forensics.wiki/android/",
+    "common_tools": [
+      "ALEAPP",
+      "Autopsy",
+      "sqlite3"
+    ],
+    "common_fields": [
+      "varies per application"
+    ],
+    "forensic_significance": "Direct access to application data including messages, contacts, call history, and location data."
+  },
+  "SIMCard": {
+    "full_name": "SIM Card Forensics",
+    "description": "SIM cards store subscriber identity (IMSI), phone numbers (MSISDN), SMS messages, contacts (ADN), last dialed numbers (LND), and network authentication data.",
+    "location": "Physical SIM card",
+    "url": "https://forensics.wiki/sim_card_forensics/",
+    "common_tools": [
+      "SIM Explorer",
+      "Paraben SIM Card Seizure",
+      "MOBILedit"
+    ],
+    "common_fields": [
+      "IMSI",
+      "ICCID",
+      "MSISDN",
+      "ADN",
+      "LND",
+      "SMS"
+    ],
+    "forensic_significance": "Subscriber identity, deleted SMS, and contact records. SIM data may differ from phone data indicating SIM swapping."
+  },
+  "PCAP": {
+    "full_name": "Packet Capture (PCAP/PCAPNG)",
+    "description": "PCAP files contain raw network packet data captured from network interfaces. PCAPNG extends the format with interface metadata, name resolution, and comment blocks.",
+    "location": "Captured via tcpdump, Wireshark, or network TAPs",
+    "url": "https://forensics.wiki/pcap/",
+    "common_tools": [
+      "Wireshark",
+      "tcpdump",
+      "tshark",
+      "Zeek",
+      "NetworkMiner"
+    ],
+    "common_fields": [
+      "Timestamp",
+      "SourceIP",
+      "DestIP",
+      "SourcePort",
+      "DestPort",
+      "Protocol",
+      "PacketLength",
+      "PayloadData"
+    ],
+    "forensic_significance": "Full network conversation reconstruction. DNS queries, HTTP requests, file transfers, and credential exposure."
+  },
+  "ZeekLogs": {
+    "full_name": "Zeek (Bro) Network Security Monitor Logs",
+    "description": "Zeek generates structured logs from network traffic: conn.log (connections), dns.log (queries), http.log (requests), files.log (transferred files), ssl.log (TLS sessions), and many more.",
+    "location": "Zeek log directory (typically /opt/zeek/logs/)",
+    "url": "https://forensics.wiki/zeek/",
+    "common_tools": [
+      "Zeek",
+      "RITA",
+      "Splunk"
+    ],
+    "common_fields": [
+      "ts",
+      "uid",
+      "id.orig_h",
+      "id.orig_p",
+      "id.resp_h",
+      "id.resp_p",
+      "proto",
+      "service",
+      "duration",
+      "orig_bytes",
+      "resp_bytes"
+    ],
+    "forensic_significance": "High-level connection summaries without full packet capture overhead. C2 detection, data exfiltration measurement, DNS tunneling identification."
+  },
+  "MemoryDump": {
+    "full_name": "Memory (RAM) Forensics",
+    "description": "RAM dumps capture the entire contents of physical memory including running processes, network connections, loaded DLLs, open file handles, registry hives, encryption keys, and user credentials.",
+    "location": "Captured via WinPMEM, FTK Imager, DumpIt, or LiME",
+    "url": "https://forensics.wiki/memory_forensics/",
+    "common_tools": [
+      "Volatility 3",
+      "Rekall",
+      "MemProcFS"
+    ],
+    "common_fields": [
+      "Process",
+      "PID",
+      "PPID",
+      "Threads",
+      "Handles",
+      "CommandLine",
+      "DLLs",
+      "Connections",
+      "VADs"
+    ],
+    "forensic_significance": "Captures volatile state lost at shutdown. Running malware, injected code, decrypted data, and network connections only available in memory."
+  },
+  "Hiberfil": {
+    "full_name": "Windows Hibernation File",
+    "description": "hiberfil.sys contains a compressed memory dump from the last hibernation. Contains the same forensic artifacts as a live memory dump but persists on disk.",
+    "location": "C:\\hiberfil.sys",
+    "url": "https://forensics.wiki/hiberfil.sys/",
+    "common_tools": [
+      "Volatility 3",
+      "Hibernation Recon"
+    ],
+    "common_fields": [
+      "Compressed memory pages"
+    ],
+    "forensic_significance": "Memory snapshot persisted to disk. May contain credentials, decrypted data, and process state from before hibernation."
+  },
+  "ESEDatabase": {
+    "full_name": "Extensible Storage Engine (ESE) Database",
+    "description": "ESE (also known as JET Blue) is a database engine used by Windows components. SRUM (SRUDB.dat), Windows Search (Windows.edb), Exchange, and Active Directory all use ESE format.",
+    "location": "Various .edb files",
+    "url": "https://forensics.wiki/extensible_storage_engine_(ese)_database_file_(edb)_format/",
+    "common_tools": [
+      "ESEDatabaseView",
+      "libesedb",
+      "dissect.esedb"
+    ],
+    "common_fields": [
+      "TableName",
+      "ColumnName",
+      "ColumnType",
+      "RecordData"
+    ],
+    "forensic_significance": "Container format for multiple forensic artifacts. Understanding ESE structure enables parsing of SRUM, Windows Search, and other ESE-backed stores."
+  },
+  "SQLiteDB": {
+    "full_name": "SQLite Database Format",
+    "description": "SQLite is an embedded database used by browsers (Chrome, Firefox, Safari), messaging apps, iOS/Android system databases, and many applications. WAL (Write-Ahead Log) and journal files may contain deleted records.",
+    "location": "Various .sqlite, .db files",
+    "url": "https://forensics.wiki/sqlite_database_format/",
+    "common_tools": [
+      "DB Browser for SQLite",
+      "sqlite3",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "varies per database schema"
+    ],
+    "forensic_significance": "WAL and journal files contain records that survived deletion from the main database. Freelist pages may hold recoverable data."
+  },
+  "OLECompound": {
+    "full_name": "OLE Compound File (MS-CFB)",
+    "description": "OLE Compound Binary File format is used by legacy Office documents (.doc, .xls, .ppt), Thumbs.db, and Jump Lists. Contains a mini filesystem with streams and storage objects.",
+    "location": "Various .doc, .xls, .ppt, .msg files",
+    "url": "https://forensics.wiki/ole_compound_file/",
+    "common_tools": [
+      "oletools",
+      "7-Zip",
+      "Autopsy"
+    ],
+    "common_fields": [
+      "StreamName",
+      "StreamSize",
+      "CLSID",
+      "CreationTime",
+      "ModificationTime"
+    ],
+    "forensic_significance": "Legacy document metadata, embedded objects, and macros. Jump Lists use OLE format for automatic destinations."
+  },
+  "EXIF": {
+    "full_name": "Exchangeable Image File Format (EXIF)",
+    "description": "EXIF metadata embedded in JPEG, TIFF, and RAW image files. Contains camera make/model, GPS coordinates, timestamps, exposure settings, and thumbnail images.",
+    "location": "Embedded in image files",
+    "url": "https://forensics.wiki/exif/",
+    "common_tools": [
+      "ExifTool",
+      "Autopsy",
+      "jhead"
+    ],
+    "common_fields": [
+      "Make",
+      "Model",
+      "DateTimeOriginal",
+      "GPSLatitude",
+      "GPSLongitude",
+      "Software",
+      "ImageWidth",
+      "ImageHeight"
+    ],
+    "forensic_significance": "Geolocation, device identification, and timestamp verification. GPS coordinates place the camera at a specific location."
   }
 }
