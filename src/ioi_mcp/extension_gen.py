@@ -6,7 +6,7 @@ Case-agnostic: generates from CSV column metadata, never from hardcoded artifact
 from typing import Optional
 
 
-IOI_EXT_NS = "https://ontology.ioi-framework.org/ext/"
+IOI_EXT_NS = "https://ioi-framework.github.io/ns/ioi-ext/"
 IOI_EXT_PREFIX = "ioi-ext"
 
 

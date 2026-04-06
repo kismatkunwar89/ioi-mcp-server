@@ -22,7 +22,7 @@ UCO_TOOL = Namespace("https://ontology.unifiedcyberontology.org/uco/tool/")
 UCO_IDENTITY = Namespace("https://ontology.unifiedcyberontology.org/uco/identity/")
 UCO_LOCATION = Namespace("https://ontology.unifiedcyberontology.org/uco/location/")
 CASE_INV = Namespace("https://ontology.caseontology.org/case/investigation/")
-IOI_EXT = Namespace("https://ontology.ioi-framework.org/ext/")
+IOI_EXT = Namespace("https://ioi-framework.github.io/ns/ioi-ext/")
 SH_NS = Namespace("http://www.w3.org/ns/shacl#")
 
 
@@ -98,15 +98,13 @@ class OntologyLoader:
 
     def _build_ext_property_index(self):
         """Index ioi-ext properties by their rdfs:domain facet."""
-        IOI_EXT_NS_STR = str(IOI_EXT)
-        # Also check for the framework's actual namespace
-        FRAMEWORK_NS = "https://ioi-framework.github.io/ns/ioi-ext/"
+        IOI_EXT_NS_STR = str(IOI_EXT)  # https://ioi-framework.github.io/ns/ioi-ext/
 
         for prop_type in [OWL.DatatypeProperty, OWL.ObjectProperty, URIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#Property")]:
             for prop_uri in self.graph.subjects(RDF.type, prop_type):
                 prop_str = str(prop_uri)
                 # Only index ioi-ext / dfc-ext properties
-                if not (IOI_EXT_NS_STR in prop_str or FRAMEWORK_NS in prop_str or "dfc-ext" in prop_str):
+                if not (IOI_EXT_NS_STR in prop_str or "dfc-ext" in prop_str):
                     continue
 
                 # Get domain (the facet this belongs to)
@@ -126,9 +124,7 @@ class OntologyLoader:
                 comments = list(self.graph.objects(prop_uri, RDFS.comment))
 
                 # Determine prefix
-                if FRAMEWORK_NS in prop_str:
-                    prefixed = f"ioi-ext:{local_name}"
-                elif IOI_EXT_NS_STR in prop_str:
+                if IOI_EXT_NS_STR in prop_str:
                     prefixed = f"ioi-ext:{local_name}"
                 else:
                     prefixed = f"dfc-ext:{local_name}"
