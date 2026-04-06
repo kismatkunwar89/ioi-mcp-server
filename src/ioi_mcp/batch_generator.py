@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Optional
 
 from ioi_mcp.ontology_loader import OntologyLoader
-from ioi_mcp.manifest import ManifestRegistry
 from ioi_mcp.extension_gen import (
     generate_turtle_patch,
     IOI_EXT_NS,
@@ -48,6 +47,28 @@ _TYPED_LITERAL_TYPES = {
 }
 
 
+def _normalize_datetime(value: str) -> str:
+    """Convert non-ISO datetime formats to ISO 8601."""
+    import re
+    from datetime import datetime
+    
+    value = value.strip()
+    
+    # Already ISO 8601
+    if re.match(r'^\d{4}-\d{2}-\d{2}', value):
+        return value
+    
+    # US locale: M/D/YYYY H:MM or M/D/YYYY H:MM:SS
+    us_match = re.match(r'^(\d{1,2})/(\d{1,2})/(\d{4})\s+(\d{1,2}):(\d{2})(:(\d{2}))?', value)
+    if us_match:
+        m, d, y = us_match.group(1), us_match.group(2), us_match.group(3)
+        hr, mn = us_match.group(4), us_match.group(5)
+        sec = us_match.group(7) or "00"
+        return f"{y}-{int(m):02d}-{int(d):02d}T{int(hr):02d}:{mn}:{sec}"
+    
+    return value
+
+
 def _serialize_value(value: str, xsd_type: str, shape_hint: str):
     """Serialize a CSV cell value into JSON-LD typed literal or plain string."""
     if not value or value.strip() == "":
@@ -76,7 +97,7 @@ def _serialize_value(value: str, xsd_type: str, shape_hint: str):
             bool_val = value.lower() in ("true", "1", "yes")
             return {"@type": "xsd:boolean", "@value": str(bool_val).lower()}
         elif xsd_type in ("xsd:dateTime", "xsd:date"):
-            return {"@type": xsd_type, "@value": value}
+            return {"@type": xsd_type, "@value": _normalize_datetime(value)}
         elif xsd_type == "xsd:hexBinary":
             return {"@type": "xsd:hexBinary", "@value": value}
         else:
@@ -88,7 +109,6 @@ def _serialize_value(value: str, xsd_type: str, shape_hint: str):
 
 def generate_all_rows(
     ontology: OntologyLoader,
-    manifest: ManifestRegistry,
     artifact_name: str,
     csv_path: str,
     column_mapping: dict[str, str],
@@ -99,7 +119,6 @@ def generate_all_rows(
 
     Args:
         ontology: loaded ontology
-        manifest: manifest registry
         artifact_name: e.g., 'Prefetch', 'SRUM'
         csv_path: path to CSV file
         column_mapping: {csv_column: "uco-observable:propertyName"}
@@ -117,8 +136,7 @@ def generate_all_rows(
             "unmapped_columns": [...],
         }
     """
-    # Resolve artifact
-    entry = manifest.resolve(artifact_name)
+    # Resolve artifact (ontology-only, no manifest)
     candidates = [artifact_name, f"Windows{artifact_name}", artifact_name.replace(" ", "")]
 
     obs_class = None
@@ -130,7 +148,7 @@ def generate_all_rows(
             break
 
     if not obs_class:
-        obs_class = entry["uco_class"] if entry else "uco-observable:ObservableObject"
+        obs_class = "uco-observable:ObservableObject"
 
     # Analyze CSV for column types
     columns = analyze_csv(csv_path)
@@ -171,11 +189,20 @@ def generate_all_rows(
             "shape_hint": _shape_from_type(col["inferred_type"]),
         }
 
-    # Determine facets from manifest
-    facet_names = entry.get("uco_facets", []) if entry else []
-    official_facets = [f for f in facet_names if not f.startswith("ioi-ext:")]
-    if not official_facets:
-        official_facets = ["FileFacet", "ContentDataFacet"]
+    # Determine facets from ontology (no manifest)
+    official_facets = []
+    # Check for matching facet by name convention
+    for fc in [f"{artifact_name}Facet", f"Windows{artifact_name}Facet"]:
+        if ontology.facet_exists(fc):
+            uri = ontology.get_facet_uri(fc)
+            official_facets.append(uri.split("/")[-1] if uri else fc)
+            break
+    # Also check ioi-ext facets
+    ext_facet_key = _to_facet_name(artifact_name).replace("Facet", "") + "Facet"
+    if ontology.get_ext_facet_properties(ext_facet_key):
+        pass  # Extension properties will be handled via column mapping
+    # Always include FileFacet and ContentDataFacet
+    official_facets.extend(["FileFacet", "ContentDataFacet"])
 
     # Group mapped properties by their target facet
     # For now: all mapped props go into the appropriate official facet

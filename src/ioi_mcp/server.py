@@ -3,13 +3,12 @@ IOI Framework MCP Server
 Scalable, case-agnostic CASE/UCO JSON-LD artifact graph generator.
 
 Tools:
-  resolve_artifact    — Rich context: manifest entry + all SHACL properties with descriptions
+  resolve_artifact    — Rich context: ontology + ioi-ext properties with descriptions
   analyze_csv         — CSV column analysis: headers, sample values, inferred types
   generate_graph      — Build JSON-LD from CSV + LLM-provided column mapping
   generate_from_csv   — Auto-generate (no mapping needed, for extension artifacts)
   get_facet_properties — SHACL property extraction for any Facet
   validate_graph      — Full IRI + SHACL validation
-  list_artifacts      — Browse the manifest
 
 Flow:
   1. Claude calls resolve_artifact → gets SHACL properties with rdfs:comment descriptions
@@ -28,7 +27,6 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
 from ioi_mcp.ontology_loader import OntologyLoader
-from ioi_mcp.manifest import ManifestRegistry
 from ioi_mcp.graph_builder import GraphBuilder
 from ioi_mcp.constraint_builder import build_generation_context
 from ioi_mcp.batch_generator import generate_all_rows
@@ -40,19 +38,17 @@ app = Server("ioi-mcp-server")
 
 # Module singletons (initialized on first use)
 _ontology: OntologyLoader | None = None
-_manifest: ManifestRegistry | None = None
 _builder: GraphBuilder | None = None
 _validator: Validator | None = None
 
 
 def _init():
     """Lazy initialization of all modules."""
-    global _ontology, _manifest, _builder, _validator
+    global _ontology, _builder, _validator
     if _ontology is None:
         ext_ttl = os.environ.get("IOI_EXT_TTL")
         _ontology = OntologyLoader(extra_ttl=ext_ttl)
-        _manifest = ManifestRegistry()
-        _builder = GraphBuilder(_ontology, _manifest)
+        _builder = GraphBuilder(_ontology)
         _validator = Validator(_ontology)
 
 
@@ -255,13 +251,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["jsonld_path"],
             },
         ),
-        Tool(
-            name="list_artifacts",
-            description=(
-                "List available artifacts in the IOI manifest. "
-                "Filter by category (execution, filesystem, registry, eventlog, "
-                "useractivity, etc.) or tier (official, extension)."
-            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -293,7 +282,6 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         "generate_from_csv": _handle_generate_csv,
         "get_facet_properties": _handle_facet_properties,
         "validate_graph": _handle_validate,
-        "list_artifacts": _handle_list,
     }
 
     handler = handlers.get(name)
@@ -304,9 +292,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 def _handle_resolve(args: dict) -> list[TextContent]:
     """
-    Scalable resolve: ontology-first, manifest-optional.
+    Scalable resolve: ontology-first, fully agnostic.
     1. Check ontology directly for ObservableObject + Facet
-    2. Fall back to manifest for curated combos
+    2. Check ioi-ext.ttl for existing extension facets
     3. If nothing found anywhere → extension path
     Always returns full SHACL properties with rdfs:comment descriptions.
     """
@@ -344,18 +332,19 @@ def _handle_resolve(args: dict) -> list[TextContent]:
             facet_name = uri.split("/")[-1] if uri else fc
             break
 
-    # --- Strategy 2: Manifest lookup (curated combos) ---
-    manifest_entry = _manifest.resolve(artifact_name)
-
     # --- Build response ---
     if obs_class and facet_name:
         # Full ontology match — build facets from SHACL
         facet_names = [facet_name, "FileFacet", "ContentDataFacet"]
-        # Merge with manifest if it has additional facets
-        if manifest_entry:
-            for mf in manifest_entry.get("uco_facets", []):
-                if mf not in facet_names and not mf.startswith("ioi-ext:"):
-                    facet_names.append(mf)
+        # Also include ioi-ext facets if they exist for this artifact
+        ext_facet_key = obs_class_name + "Facet" if obs_class_name else None
+        # Check common extension facet name patterns
+        for ext_name in [f"{artifact_name}Facet", f"Windows{artifact_name}Facet", 
+                         f"{obs_class_name}Facet" if obs_class_name else None]:
+            if ext_name and _ontology.get_ext_facet_properties(ext_name):
+                if ext_name not in facet_names:
+                    facet_names.append(ext_name)
+                break
 
         facet_details = _build_facet_details(facet_names)
 
@@ -370,24 +359,6 @@ def _handle_resolve(args: dict) -> list[TextContent]:
                 "Call analyze_csv with your CSV file to see column headers and sample values. "
                 "Then match CSV columns to the properties listed above based on their descriptions. "
                 "Finally call generate_graph with your column_mapping."
-            ),
-        }
-
-    elif manifest_entry:
-        # Manifest hit (may include extension facets)
-        facet_names = manifest_entry.get("uco_facets", [])
-        facet_details = _build_facet_details(facet_names)
-
-        result = {
-            "found": True,
-            "source": "manifest",
-            "artifact": manifest_entry.get("canonical_name", artifact_name),
-            "tier": manifest_entry.get("tier"),
-            "uco_class": manifest_entry.get("uco_class"),
-            "facets": facet_details,
-            "next_step": (
-                "Call analyze_csv with your CSV file, then generate_graph with column_mapping. "
-                "Unmapped columns become ioi-ext: extension properties automatically."
             ),
         }
 
@@ -518,10 +489,7 @@ def _handle_generation_context(args: dict) -> list[TextContent]:
             text=json.dumps({"error": f"CSV file not found: {csv_path}"}),
         )]
 
-    # Resolve artifact to get class and facets
-    entry = _manifest.resolve(artifact_name)
-
-    # Ontology-first resolution (same as resolve_artifact)
+    # Ontology-only resolution
     candidates = [artifact_name, f"Windows{artifact_name}", artifact_name.replace(" ", "")]
     obs_class = None
     obs_class_name = None
@@ -542,11 +510,6 @@ def _handle_generation_context(args: dict) -> list[TextContent]:
                 facet_names.append(uri.split("/")[-1] if uri else fc)
                 break
         facet_names.extend(["FileFacet", "ContentDataFacet"])
-    elif entry:
-        obs_class = entry.get("uco_class", "uco-observable:ObservableObject")
-        facet_names = [f for f in entry.get("uco_facets", []) if not f.startswith("ioi-ext:")]
-        if not facet_names:
-            facet_names = ["FileFacet", "ContentDataFacet"]
     else:
         obs_class = "uco-observable:ObservableObject"
         facet_names = ["FileFacet", "ContentDataFacet"]
@@ -591,7 +554,6 @@ def _handle_generate_all_rows(args: dict) -> list[TextContent]:
 
     result = generate_all_rows(
         ontology=_ontology,
-        manifest=_manifest,
         artifact_name=artifact_name,
         csv_path=csv_path,
         column_mapping=column_mapping,
@@ -631,6 +593,8 @@ def _handle_generate_csv(args: dict) -> list[TextContent]:
             text=json.dumps({"error": f"CSV file not found: {csv_path}"}),
         )]
 
+    # Note: generate_from_csv uses the old graph_builder (kept for backward compat)
+    # Prefer generate_all_rows for production use
     result = _builder.build_from_csv(artifact_name, csv_path, description)
 
     validation = _validator.validate_jsonld(
@@ -702,27 +666,6 @@ def _handle_validate(args: dict) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(result.to_dict(), indent=2))]
 
 
-def _handle_list(args: dict) -> list[TextContent]:
-    category = args.get("category")
-    tier = args.get("tier")
-    items = _manifest.list_all(category=category, tier=tier)
-
-    result = {
-        "total": len(items),
-        "filter_category": category,
-        "filter_tier": tier,
-        "artifacts": [
-            {
-                "name": item["name"],
-                "tier": item.get("tier"),
-                "uco_class": item.get("uco_class"),
-                "category": item.get("category"),
-            }
-            for item in items
-        ],
-    }
-
-    return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
 
 # ─── Entry point ─────────────────────────────────────────────────────
