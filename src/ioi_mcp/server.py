@@ -644,6 +644,31 @@ def _handle_resolve(args: dict) -> list[TextContent]:
                 "generate_all_rows."
             )
 
+        # Also find relevant facets via property-description semantic search
+        # (catches cases like EVTX→EventRecordFacet that keyword search misses)
+        if not wiki_desc:
+            wiki_desc = _ontology.get_artifact_description(artifact_name)
+        sem_desc = ""
+        if isinstance(wiki_desc, dict):
+            sem_desc = wiki_desc.get("description", "")
+        elif isinstance(wiki_desc, str):
+            sem_desc = wiki_desc
+        if sem_desc:
+            relevant_facets = _ontology.find_relevant_facets(
+                artifact_name, description=sem_desc, top_n=3
+            )
+            if relevant_facets:
+                # Merge with candidates, avoid duplicates
+                existing = {c["class"] for c in result.get("ontology_candidates", [])}
+                new_facets = [f for f in relevant_facets if f["facet"] not in existing]
+                if new_facets:
+                    result["semantic_facet_matches"] = new_facets
+                    result["semantic_note"] = (
+                        "Additional facets found by matching artifact description "
+                        "keywords against property rdfs:comment descriptions. "
+                        "These may be relevant — review their properties for mapping."
+                    )
+
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
 

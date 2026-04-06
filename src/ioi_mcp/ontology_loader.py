@@ -481,3 +481,76 @@ class OntologyLoader:
 
         candidates.sort(key=lambda x: -x["score"])
         return candidates[:5]
+
+    def find_relevant_facets(
+        self, artifact_name: str, description: str = "", top_n: int = 3
+    ) -> list[dict]:
+        """
+        Find relevant CASE/UCO facets by matching artifact description keywords
+        against property rdfs:comment descriptions. Inspired by case_uco.py's
+        semantic property search.
+
+        Also walks superclass hierarchy to discover inherited facets.
+
+        Returns ranked facets with matched keywords and property lists.
+        """
+        import re
+
+        # 1. Build property-description corpus per facet
+        facet_corpus = {}  # local_name → corpus text
+        for name_lower, uri in self._facet_index.items():
+            local = str(uri).split("/")[-1]
+            props = self.get_facet_properties(local)
+            if not props:
+                continue
+            parts = [local]
+            for p in props:
+                parts.append(p["local_name"])
+                desc = p.get("description", "")
+                if desc:
+                    parts.append(desc)
+            facet_corpus[local] = " ".join(parts).lower()
+
+        # 2. Extract keywords from artifact description
+        tokens = set(re.findall(r'[a-z]{4,}', description.lower()))
+        stop = {
+            "that", "this", "with", "from", "have", "been", "each", "also",
+            "used", "file", "files", "data", "system", "which", "when",
+            "into", "more", "other", "their", "about", "provides", "contains",
+            "including", "stored", "based", "changes", "between", "through",
+            "information", "windows", "using", "these", "those", "after",
+            "before", "such", "than", "most", "some", "only", "every",
+        }
+        tokens -= stop
+        # Add artifact name tokens
+        name_toks = set(re.findall(r'[a-z]{3,}', re.sub(
+            r'([a-z])([A-Z])', r'\1 \2', artifact_name).lower()))
+        tokens |= name_toks
+
+        # 3. Score each facet by keyword overlap with property descriptions
+        scored = []
+        for facet_name, corpus in facet_corpus.items():
+            matched = [t for t in tokens if t in corpus]
+            if not matched:
+                continue
+            props = self.get_facet_properties(facet_name)
+            datatype_props = [
+                {
+                    "name": p["name"],
+                    "local_name": p["local_name"],
+                    "description": p.get("description", "")[:120],
+                    "type": p["range"],
+                    "type_category": p.get("range_type", ""),
+                }
+                for p in props
+            ]
+            scored.append({
+                "facet": facet_name,
+                "score": len(matched),
+                "matched_keywords": matched[:8],
+                "property_count": len(props),
+                "properties": datatype_props,
+            })
+
+        scored.sort(key=lambda x: -x["score"])
+        return scored[:top_n]

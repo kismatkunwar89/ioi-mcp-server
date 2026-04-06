@@ -149,14 +149,14 @@ def generate_all_rows(
 
     # Keyword search fallback for observable class
     if not obs_class:
-        wiki_desc = ontology.get_artifact_description(artifact_name)
-        desc_text = ""
-        if isinstance(wiki_desc, dict):
-            desc_text = wiki_desc.get("description", "")
-        elif isinstance(wiki_desc, str):
-            desc_text = wiki_desc
+        _wiki = ontology.get_artifact_description(artifact_name)
+        _desc = ""
+        if isinstance(_wiki, dict):
+            _desc = _wiki.get("description", "")
+        elif isinstance(_wiki, str):
+            _desc = _wiki
         search_results = ontology.search_candidates(
-            artifact_name, description=desc_text, threshold=40
+            artifact_name, description=_desc, threshold=40
         )
         for sr in search_results:
             if sr["type"] == "observable":
@@ -205,6 +205,14 @@ def generate_all_rows(
             "shape_hint": _shape_from_type(col["inferred_type"]),
         }
 
+    # Resolve wiki description once for reuse
+    wiki_desc = ontology.get_artifact_description(artifact_name)
+    desc_text = ""
+    if isinstance(wiki_desc, dict):
+        desc_text = wiki_desc.get("description", "")
+    elif isinstance(wiki_desc, str):
+        desc_text = wiki_desc
+
     # Determine facets from ontology (no manifest)
     official_facets = []
     # Step 1: Check for matching facet by exact name convention
@@ -216,12 +224,6 @@ def generate_all_rows(
     # Step 2: If no exact match, use keyword search to find facets
     #   e.g. "MFT" -> finds MftRecordFacet via tokenized search
     if not official_facets:
-        wiki_desc = ontology.get_artifact_description(artifact_name)
-        desc_text = ""
-        if isinstance(wiki_desc, dict):
-            desc_text = wiki_desc.get("description", "")
-        elif isinstance(wiki_desc, str):
-            desc_text = wiki_desc
         candidates = ontology.search_candidates(
             artifact_name, description=desc_text, threshold=25
         )
@@ -236,12 +238,27 @@ def generate_all_rows(
                     if f_info["property_count"] > 0:
                         official_facets.append(f_info["facet"])
                 break  # Use first observable candidate's facets
+    # Step 3: Semantic facet search — find relevant facets via property
+    # description keyword matching. These go to available_official_facets
+    # (informational for LLM) rather than auto-matching, because SHACL
+    # datatype constraints require careful type-aware mapping.
+    semantic_facets_found = []
+    if desc_text:
+        sem_facets = ontology.find_relevant_facets(
+            artifact_name, description=desc_text, top_n=3
+        )
+        for sf in sem_facets:
+            if sf["score"] >= 3 and sf["facet"] not in official_facets:
+                if sf["facet"] not in ("FileFacet", "ContentDataFacet"):
+                    semantic_facets_found.append(sf)
     # Also check ioi-ext facets
     ext_facet_key = _to_facet_name(artifact_name).replace("Facet", "") + "Facet"
     if ontology.get_ext_facet_properties(ext_facet_key):
         pass  # Extension properties will be handled via column mapping
-    # Always include FileFacet and ContentDataFacet
-    official_facets.extend(["FileFacet", "ContentDataFacet"])
+    # Always include FileFacet and ContentDataFacet (deduplicate)
+    for default_f in ["FileFacet", "ContentDataFacet"]:
+        if default_f not in official_facets:
+            official_facets.append(default_f)
 
     # Pre-compute auto-match: for discovered official facets, match CSV
     # columns to SHACL properties by exact name match (case-insensitive).
@@ -256,15 +273,27 @@ def generate_all_rows(
         auto = {}
         for prop in facet_props:
             if prop.get("range_type") == "object":
-                continue  # Skip hash, alternateDataStreams, etc.
+                continue  # Skip hash, alternateDataStreams — need nested nodes
             prop_local = prop["local_name"]
+            # Gate 1: Verify the property IRI exists in ontology
+            prop_iri_valid, _ = ontology.validate_type_iri(prop["name"])
+            if not prop_iri_valid:
+                continue
+            shacl_range = str(prop.get("range", "")).lower()
             for csv_col in list(unmapped_props.keys()):
                 col_clean = csv_col.replace(" ", "").lower()
                 if prop_local.lower() == col_clean:
-                    shacl_range = prop.get("range", "")
-                    xsd_type = col_types.get(csv_col, "xsd:string")
-                    if "xsd:" in str(shacl_range):
-                        xsd_type = str(shacl_range)
+                    csv_type = col_types.get(csv_col, "xsd:string")
+                    # Gate 2: Datatype compatibility check
+                    # SHACL range must be compatible with CSV inferred type
+                    compatible = _dtype_compatible(csv_type, shacl_range)
+                    if not compatible:
+                        break  # Name matches but type doesn't — skip
+                    # Use SHACL type if available, else CSV inferred
+                    xsd_type = f"xsd:{shacl_range}" if shacl_range and shacl_range in (
+                        "string", "integer", "boolean", "datetime", "decimal",
+                        "date", "float", "double", "hexbinary",
+                    ) else csv_type
                     auto[csv_col] = {
                         "prop_name": prop["name"],
                         "xsd_type": xsd_type,
@@ -421,7 +450,62 @@ def generate_all_rows(
             "Example: {'EntryNumber': 'uco-observable:mftFileID'}"
         )
 
+    # Add semantically discovered facets (from property description matching)
+    if semantic_facets_found:
+        result["semantic_facet_matches"] = semantic_facets_found
+        result["semantic_hint"] = (
+            "Additional CASE/UCO facets found by matching artifact description "
+            "against property descriptions. Review and include relevant properties "
+            "in column_mapping to use them."
+        )
+
     return result
+
+
+def _dtype_compatible(csv_type: str, shacl_range: str) -> bool:
+    """Check if a CSV inferred type is compatible with a SHACL range.
+    
+    Follows gate logic from case_uco.py: string is compatible with string,
+    integer with integer/nonNegativeInteger, dateTime with dateTime, etc.
+    String columns are compatible with string SHACL ranges.
+    Integer columns are NOT compatible with dateTime ranges.
+    """
+    csv_t = csv_type.lower().replace("xsd:", "")
+    shacl_t = shacl_range.lower().replace("xsd:", "")
+    
+    if not shacl_t or shacl_t in ("", "none"):
+        return True  # No SHACL constraint = anything goes
+    
+    # Exact match
+    if csv_t == shacl_t:
+        return True
+    
+    # String CSV values can match string SHACL properties
+    if csv_t == "string" and shacl_t == "string":
+        return True
+    
+    # Integer CSV compatible with integer/nonNegativeInteger
+    if csv_t == "integer" and shacl_t in ("integer", "nonnegativeinteger", "int", "long"):
+        return True
+    
+    # DateTime CSV compatible with dateTime
+    if csv_t == "datetime" and shacl_t in ("datetime", "date"):
+        return True
+    
+    # Boolean
+    if csv_t == "boolean" and shacl_t == "boolean":
+        return True
+    
+    # String CSV can coerce to string SHACL (most permissive)
+    if shacl_t == "string":
+        return True
+    
+    # Integer→string is acceptable (will be serialized as string)
+    if csv_t == "integer" and shacl_t == "string":
+        return True
+    
+    # Everything else is incompatible
+    return False
 
 
 def _shape_from_type(xsd_type: str) -> str:
