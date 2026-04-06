@@ -10,32 +10,55 @@ Removes the ontology expertise barrier for contributors. Users provide a CSV (fo
 
 The MCP server provides knowledge. Claude (or any MCP client) provides reasoning.
 
-1. **resolve_artifact** — Queries CASE/UCO ontology + existing `ioi-ext.ttl` for properties with `rdfs:comment` descriptions
-2. **analyze_csv** — Extracts column headers, infers xsd types from actual values, returns sample data
-3. **get_generation_context** — Returns full constraint context (datatype, objectType, nodeKind, shape hints) for LLM-driven JSON-LD generation
-4. **validate_graph** — IRI resolution + @id format + @context completeness + SHACL via `case_validate`
-5. **list_artifacts** — Browse the manifest (52 artifacts from forensics.wiki)
+### Core Generation Tools (7)
+
+| Tool | Description |
+|------|-------------|
+| `resolve_artifact` | Queries CASE/UCO ontology + `ioi-ext.ttl` + forensics.wiki descriptions for full context |
+| `analyze_csv` | Extracts column headers, infers xsd types from actual values, returns sample data |
+| `get_generation_context` | Returns full constraint context (datatype, objectType, nodeKind, shape hints) for LLM-driven JSON-LD generation |
+| `generate_all_rows` | Deterministic batch generation: one ObservableObject per CSV row with typed literals |
+| `generate_from_csv` | Auto-generate JSON-LD without manual mapping (extension artifacts) |
+| `get_facet_properties` | SHACL property extraction for any Facet |
+| `validate_graph` | IRI resolution + @id format + @context completeness + SHACL via `case_validate` |
+
+### Contribution Workflow Tools (4)
+
+| Tool | Description |
+|------|-------------|
+| `scaffold_case` | Assemble a complete `CASES/AF-NEW/` directory structure for an IoI contribution PR |
+| `draft_sparql_context` | Extract property IRIs from JSON-LD graphs for writing SPARQL detection rules |
+| `generate_test_graph` | Create synthetic test graphs with specific values for SPARQL rule validation |
+| `test_rule` | Execute SPARQL `.rq` files against rdflib Dataset named graphs (no Virtuoso needed) |
 
 ## Architecture
 
 - **Ontology-first resolution**: 171 ObservableObject classes + 149 Facets queried at runtime from CASE/UCO 1.4.0
-- **Existing ioi-ext.ttl**: 5 extension facets (MFT, USN, LNK, EVTX, Office XML) with 19 curated properties loaded automatically
-- **No duck typing**: Exact manifest lookup for known artifacts, clean extension generation for unknown ones
+- **Three-tier resolution**: ontology hit → `ioi-ext.ttl` hit → auto-generate extension
+- **No duck typing**: Exact ontology lookup for known artifacts, clean extension generation for unknown ones
 - **LLM-driven generation**: MCP provides constraints, Claude generates JSON-LD (no hardcoded templates)
+- **Fully scalable**: No static artifact lists — any new artifact works through the extension path
 
 ## Coverage
 
-| Source | Artifacts | Behavior |
-|--------|-----------|----------|
-| CASE/UCO ontology | 29 (Prefetch, Registry, EVTX, etc.) | Official class + SHACL properties |
-| Existing ioi-ext.ttl | 5 (MFT, USN, LNK, EVTX, Office XML) | Curated extension properties |
-| Manifest (extension) | 18 (SRUM, Amcache, ShimCache, etc.) | Auto-generated ioi-ext terms |
-| Unknown artifacts | Unlimited | Full extension generation + Turtle patch |
+85 forensic artifacts indexed across 7 categories:
+
+| Category | Count | Examples |
+|----------|-------|----------|
+| Windows | 55 | MFT, EVTX, Prefetch, Registry, Amcache, ShimCache, SRUM, JumpList, LNK, WER, RDP Logs |
+| macOS | 10 | FSEvents, KnowledgeC, Unified Logs, Launch Agents/Daemons, CrashReporter, Quarantine |
+| Network | 6 | PCAP, ZeekLogs, DNS Cache, NetFlow, Proxy Logs, Network Connections |
+| Cross-platform | 5 | Email Headers, EXIF, SQLite, OLE Compound, Office Metadata |
+| Linux | 4 | Bash History, Crontab, Linux Logs, ext Filesystem |
+| Mobile | 3 | iOS Backup, Android SQLite, SIM Card |
+| Memory | 2 | Memory Dump, Hiberfil |
+
+Any artifact **not** in the index still works — the server generates extension terms automatically. The index enriches `resolve_artifact` with domain descriptions for better LLM reasoning.
 
 ## Installation
 
 ```bash
-git clone https://github.com/ioi-framework/ioi-mcp-server.git
+git clone https://github.com/kismatkunwar89/ioi-mcp-server.git
 cd ioi-mcp-server
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
@@ -82,33 +105,27 @@ Add to your MCP config (`~/.claude/claude_desktop_config.json` or `.cursor/mcp.j
 
 Replace `/path/to/ioi-mcp-server` with your actual clone path.
 
-## Usage (programmatic)
+## Usage (Programmatic)
 
 ```python
 from ioi_mcp.ontology_loader import OntologyLoader
-from ioi_mcp.manifest import ManifestRegistry
-from ioi_mcp.graph_builder import GraphBuilder
+from ioi_mcp.batch_generator import generate_all_rows
 from ioi_mcp.validator import Validator
 
 ont = OntologyLoader()
-m = ManifestRegistry()
-builder = GraphBuilder(ont, m)
 validator = Validator(ont)
 
 # Generate JSON-LD from any forensic tool CSV
-result = builder.build_from_csv("SRUM", "path/to/srum.csv")
+result = generate_all_rows(
+    ontology=ont,
+    artifact_name="SRUM",
+    csv_path="path/to/srum.csv",
+    column_mapping={"AppId": "ioi-ext:appId", "Timestamp": "ioi-ext:timestamp"},
+)
 
 # Validate (IRI + SHACL)
 v = validator.validate_jsonld(result["jsonld"], result.get("turtle_patch"))
 print("Valid:", v.valid)
-
-# Output files
-import json
-with open("srum.jsonld", "w") as f:
-    json.dump(result["jsonld"], f, indent=2)
-if result.get("turtle_patch"):
-    with open("srum_ext.ttl", "w") as f:
-        f.write(result["turtle_patch"])
 ```
 
 ## Contribution Alignment
@@ -126,3 +143,13 @@ Maps to the [IOI Framework contribution levels](https://ioi-framework.github.io/
 - `mcp` — MCP Python SDK (stdio transport)
 
 No Docker. No Virtuoso. No network at runtime. Self-contained.
+
+## Acknowledgments
+
+Artifact descriptions in `forensics_wiki_index.json` are derived from the [Forensics Wiki](https://forensics.wiki/), a community-maintained open-source knowledge base for digital forensics. The Forensics Wiki is licensed under Creative Commons and hosted on [GitHub](https://github.com/forensicswiki/wiki). We gratefully acknowledge the contributors and maintainers of the Forensics Wiki for providing comprehensive, freely available documentation of forensic artifact structures, locations, and investigative significance.
+
+This project also builds upon:
+
+- [CASE/UCO](https://caseontology.org/) — The Cyber-investigation Analysis Standard Expression ontology
+- [case-utils](https://github.com/casework/CASE-Utilities-Python) — CASE Python utilities and SHACL validation
+- [IOI Framework](https://ioi-framework.github.io/) — Indicators of Inconsistency for anti-forensic detection
