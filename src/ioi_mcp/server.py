@@ -31,6 +31,9 @@ from ioi_mcp.graph_builder import GraphBuilder
 from ioi_mcp.constraint_builder import build_generation_context
 from ioi_mcp.batch_generator import generate_all_rows
 from ioi_mcp.validator import Validator
+from ioi_mcp.scaffold_case import scaffold_case as _scaffold_case
+from ioi_mcp.sparql_context import extract_sparql_context
+from ioi_mcp.test_rule import test_rule as _test_rule, generate_test_graph as _generate_test_graph
 from ioi_mcp.type_inferencer import analyze_csv as _analyze_csv
 
 # Initialize server
@@ -268,6 +271,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         "generate_from_csv": _handle_generate_csv,
         "get_facet_properties": _handle_facet_properties,
         "validate_graph": _handle_validate,
+        "scaffold_case": _handle_scaffold_case,
+        "draft_sparql_context": _handle_sparql_context,
+        "generate_test_graph": _handle_test_graph,
+        "test_rule": _handle_test_rule,
     }
 
     handler = handlers.get(name)
@@ -668,3 +675,57 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ─── New contribution workflow tools ─────────────────────────────
+
+def _handle_scaffold_case(args: dict) -> list[TextContent]:
+    """Assemble a complete CASES/AF-NEW/ directory for a PR."""
+    result = _scaffold_case(
+        output_dir=args["output_dir"],
+        case_id=args.get("case_id", "AF-NEW"),
+        title=args["title"],
+        summary=args["summary"],
+        artifacts=args["artifacts"],
+        contributor=args.get("contributor", "community"),
+        category=args.get("category", "temporal"),
+        inconsistency_description=args.get("inconsistency_description", ""),
+    )
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+def _handle_sparql_context(args: dict) -> list[TextContent]:
+    """Extract property IRIs from graphs for SPARQL rule writing."""
+    result = extract_sparql_context(
+        graphs=args["graphs"],
+        contradiction_description=args.get("contradiction_description", ""),
+        category=args.get("category", "temporal"),
+    )
+    return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
+
+
+def _handle_test_graph(args: dict) -> list[TextContent]:
+    """Generate a synthetic test graph with specific values."""
+    graph = _generate_test_graph(
+        artifact_name=args["artifact_name"],
+        graph_iri=args["graph_iri"],
+        synthetic_values=args["synthetic_values"],
+    )
+    # Save to file
+    output_path = args.get("output_path", f"/tmp/{args['artifact_name'].lower()}_test.jsonld")
+    with open(output_path, "w") as f:
+        json.dump(graph, f, indent=2)
+    return [TextContent(type="text", text=json.dumps({
+        "success": True,
+        "output_path": output_path,
+        "node_count": len(graph.get("@graph", [])),
+    }, indent=2))]
+
+
+def _handle_test_rule(args: dict) -> list[TextContent]:
+    """Load graphs into rdflib Dataset and execute a SPARQL rule."""
+    result = _test_rule(
+        rule_path=args["rule_path"],
+        graphs=args["graphs"],
+    )
+    return [TextContent(type="text", text=json.dumps(result, indent=2, default=str))]
