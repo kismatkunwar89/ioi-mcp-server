@@ -380,8 +380,8 @@ class OntologyLoader:
             "the", "and", "for", "with", "from", "that", "this", "are", "was",
             "has", "had", "have", "each", "every", "can", "also", "its",
             "file", "files", "data", "system", "information", "used", "using",
-            "provides", "contains", "including", "entries", "entry", "records",
-            "record", "stored", "level", "based", "changes", "which", "into",
+            "provides", "contains", "including", "entries", "entry",
+            "stored", "level", "based", "changes", "which", "into",
             "when", "such", "than", "been", "will", "being", "more", "other",
             "may", "per", "between", "both", "under", "over", "where", "these",
             "those", "they", "their", "about", "through", "during", "after",
@@ -411,9 +411,12 @@ class OntologyLoader:
         candidates = []
         for class_name, info in search_space.items():
             score = 0
-            class_tokens = tokenize(class_name)
+            # Tokenize from the original URI local name (preserves CamelCase)
+            # so EventRecord → {event, record}, not {eventrecord}
+            original_local = info["uri"].split("/")[-1]
+            class_tokens = tokenize(original_local)
             all_text = " ".join(
-                [class_name] + info["labels"] + info["comments"]
+                [class_name, original_local] + info["labels"] + info["comments"]
             ).lower()
 
             # Exact name match (highest signal)
