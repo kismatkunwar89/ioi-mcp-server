@@ -49,9 +49,10 @@ def _normalize_datetime(value: str) -> str:
     
     value = value.strip()
     
-    # Already ISO 8601
+    # Already ISO 8601 (or close) — normalize space to T
     if re.match(r'^\d{4}-\d{2}-\d{2}', value):
-        return value
+        # Replace space separator with T for strict ISO 8601
+        return re.sub(r'^(\d{4}-\d{2}-\d{2})\s+(\d)', r'\1T\2', value)
     
     # US locale: M/D/YYYY H:MM or M/D/YYYY H:MM:SS
     us_match = re.match(r'^(\d{1,2})/(\d{1,2})/(\d{4})\s+(\d{1,2}):(\d{2})(:(\d{2}))?', value)
@@ -159,7 +160,10 @@ def generate_all_rows(
                 break
 
     if not obs_class:
-        obs_class = "observable:ObservableObject"
+        # Default to observable:File for most forensic artifacts
+        # (MFT, LNK, EVTX, Prefetch, USN, etc. are all file-based)
+        # Matches IOI Framework convention where observable:File is standard
+        obs_class = "observable:File"
 
     # Analyze CSV for column types
     columns = analyze_csv(csv_path)
