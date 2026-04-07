@@ -559,7 +559,10 @@ async def list_tools() -> list[Tool]:
             description=(
                 "Load JSON-LD graphs into rdflib Dataset as named graphs and execute a SPARQL .rq rule. "
                 "Returns: row_count, columns, rows, fired (bool). "
-                "fired=true = rule detected the contradiction. No Virtuoso needed."
+                "fired=true = rule detected the contradiction. No Virtuoso needed. "
+                "NOTE: rdflib has known limitations with cross-graph FILTER NOT EXISTS / MINUS patterns. "
+                "Write rules in default-graph form (no GRAPH clauses) for reliable local testing. "
+                "The playground also uses default-graph queries — same form works in both."
             ),
             inputSchema={
                 "type":"object",
