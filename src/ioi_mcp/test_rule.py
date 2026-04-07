@@ -24,7 +24,7 @@ def test_rule(
     Args:
         rule_path: path to .rq file
         graphs: list of {
-            "graph_iri": "http://example.org/mft_caseN",
+            "graph_iri": "https://ioi-framework.github.io/cases/AF-NEW/graphs/mft",
             "graph_path": "/path/to/mft_full_graph.jsonld"
         }
 
@@ -155,7 +155,7 @@ def generate_test_graph(
 
     Args:
         artifact_name: e.g., "MFT"
-        graph_iri: e.g., "http://example.org/mft_test"
+        graph_iri: e.g., "https://ioi-framework.github.io/cases/AF-NEW/graphs/mft"
         synthetic_values: {
             "facet_type": "ioi-ext:MftFacet",
             "entity_type": "observable:File",
@@ -174,7 +174,7 @@ def generate_test_graph(
 
     if context is None:
         context = {
-            "kb": "http://example.org/kb/",
+            "kb": "https://ioi-framework.github.io/kg/kb/",
             "core": "https://ontology.unifiedcyberontology.org/uco/core/",
             "observable": "https://ontology.unifiedcyberontology.org/uco/observable/",
             "ioi-ext": "https://ioi-framework.github.io/ns/ioi-ext/",
