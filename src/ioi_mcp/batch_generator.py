@@ -1,10 +1,11 @@
 """
 Batch generator — deterministic row-by-row JSON-LD generation.
-Takes a column mapping (from Claude's reasoning) + CSV and emits one
-ObservableObject per row in a complete @graph.
 
-This is the missing piece between get_generation_context and validate_graph.
-Claude reasons the mapping, this tool does the mechanical serialization.
+Registry path (M-4): When a registry_entry is passed, uses canonical
+field_types and facet directly — no ontology derivation needed.
+
+Provenance path (M-5): Emits source-file + entry + action nodes
+matching the IoI Framework instantiator structure.
 """
 
 import csv
@@ -23,85 +24,210 @@ from ioi_mcp.extension_gen import (
 )
 from ioi_mcp.type_inferencer import analyze_csv, infer_xsd_type
 
+# ─── Constants ────────────────────────────────────────────────────────────────
 
-# Standard @context — uses short prefix names (core:, observable:) to match
-# the IOI Framework convention used in CASES/ and RULES/
+KB_NAMESPACE = "https://ioi-framework.github.io/kb/"
+
 BASE_CONTEXT = {
-    "kb": "http://example.org/kb/",
-    "core": "https://ontology.unifiedcyberontology.org/uco/core/",
-    "observable": "https://ontology.unifiedcyberontology.org/uco/observable/",
-    "uco-action": "https://ontology.unifiedcyberontology.org/uco/action/",
-    "ioi-ext": IOI_EXT_NS,
-    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "kb":          KB_NAMESPACE,
+    "core":        "https://ontology.unifiedcyberontology.org/uco/core/",
+    "observable":  "https://ontology.unifiedcyberontology.org/uco/observable/",
+    "uco-action":  "https://ontology.unifiedcyberontology.org/uco/action/",
+    "ioi-ext":     IOI_EXT_NS,
+    "xsd":         "http://www.w3.org/2001/XMLSchema#",
 }
 
-# Types that need typed literal serialization
 _TYPED_LITERAL_TYPES = {
     "xsd:integer", "xsd:decimal", "xsd:boolean",
     "xsd:dateTime", "xsd:date", "xsd:hexBinary",
 }
 
+# FileFacet property → observable: prefix mapping (standard CASE/UCO)
+_FILE_FACET_PROP_MAP = {
+    "FileName":        "observable:fileName",
+    "Extension":       "observable:extension",
+    "FileSize":        "observable:sizeInBytes",
+    "IsDirectory":     "observable:isDirectory",
+    "ReferenceCount":  "observable:ntfsHardLinkCount",
+    "SecurityId":      "observable:ntfsOwnerSID",
+    "Name":            "observable:fileName",
+    "ParentPath":      "observable:filePath",
+    "SourceFile":      "observable:fileName",
+    "FilePath":        "observable:filePath",
+}
+
+# ─── Serialisation helpers ────────────────────────────────────────────────────
 
 def _normalize_datetime(value: str) -> str:
-    """Convert non-ISO datetime formats to ISO 8601."""
     import re
-    from datetime import datetime
-    
     value = value.strip()
-    
-    # Already ISO 8601 (or close) — normalize space to T
-    if re.match(r'^\d{4}-\d{2}-\d{2}', value):
-        # Replace space separator with T for strict ISO 8601
-        return re.sub(r'^(\d{4}-\d{2}-\d{2})\s+(\d)', r'\1T\2', value)
-    
-    # US locale: M/D/YYYY H:MM or M/D/YYYY H:MM:SS
-    us_match = re.match(r'^(\d{1,2})/(\d{1,2})/(\d{4})\s+(\d{1,2}):(\d{2})(:(\d{2}))?', value)
-    if us_match:
-        m, d, y = us_match.group(1), us_match.group(2), us_match.group(3)
-        hr, mn = us_match.group(4), us_match.group(5)
-        sec = us_match.group(7) or "00"
+    if re.match(r"^\d{4}-\d{2}-\d{2}", value):
+        return re.sub(r"^(\d{4}-\d{2}-\d{2})\s+(\d)", r"T", value)
+    us = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?", value)
+    if us:
+        m, d, y = us.group(1), us.group(2), us.group(3)
+        hr, mn  = us.group(4), us.group(5)
+        sec     = us.group(6) or "00"
         return f"{y}-{int(m):02d}-{int(d):02d}T{int(hr):02d}:{mn}:{sec}"
-    
     return value
 
 
-def _serialize_value(value: str, xsd_type: str, shape_hint: str):
-    """Serialize a CSV cell value into JSON-LD typed literal or plain string."""
+def _serialize(value: str, xsd_type: str, shape_hint: str):
     if not value or value.strip() == "":
         return None
-
     value = value.strip()
-
     if shape_hint == "linked_object":
-        # Object properties need nested node — skip in batch mode
-        # (Claude handles these in manual generation)
         return None
-
     if xsd_type in _TYPED_LITERAL_TYPES:
-        # Typed literal
         if xsd_type == "xsd:integer":
-            try:
-                return {"@type": "xsd:integer", "@value": str(int(value))}
-            except ValueError:
-                return value
-        elif xsd_type == "xsd:decimal":
-            try:
-                return {"@type": "xsd:decimal", "@value": str(float(value))}
-            except ValueError:
-                return value
-        elif xsd_type == "xsd:boolean":
-            bool_val = value.lower() in ("true", "1", "yes")
-            return {"@type": "xsd:boolean", "@value": str(bool_val).lower()}
-        elif xsd_type in ("xsd:dateTime", "xsd:date"):
+            try:   return {"@type": "xsd:integer", "@value": str(int(float(value)))}
+            except ValueError: return value
+        if xsd_type == "xsd:decimal":
+            try:   return {"@type": "xsd:decimal", "@value": str(float(value))}
+            except ValueError: return value
+        if xsd_type == "xsd:boolean":
+            return {"@type": "xsd:boolean",
+                    "@value": str(value.lower() in ("true", "1", "yes")).lower()}
+        if xsd_type in ("xsd:dateTime", "xsd:date"):
             return {"@type": xsd_type, "@value": _normalize_datetime(value)}
-        elif xsd_type == "xsd:hexBinary":
+        if xsd_type == "xsd:hexBinary":
             return {"@type": "xsd:hexBinary", "@value": value}
-        else:
-            return {"@type": xsd_type, "@value": value}
-    else:
-        # Plain string
-        return value
+        return {"@type": xsd_type, "@value": value}
+    return value
 
+
+def _shape(xsd_type: str) -> str:
+    if "integer" in xsd_type: return "integer_literal"
+    if "dateTime" in xsd_type or "date" in xsd_type: return "datetime_literal"
+    if "decimal" in xsd_type or "float" in xsd_type: return "number_literal"
+    if "boolean" in xsd_type: return "boolean_literal"
+    if "hexBinary" in xsd_type: return "hex_literal"
+    return "string"
+
+
+# ─── Registry-aware fast path ─────────────────────────────────────────────────
+
+def _generate_registry_path(
+    artifact_name: str,
+    csv_path: str,
+    column_mapping: dict,
+    registry_entry: dict,
+    include_provenance: bool = True,
+) -> tuple[list, list]:
+    """
+    Fast path for registry-known artifacts.
+    Returns (graph_nodes, unmapped_cols_for_turtle_patch).
+    """
+    field_types  = registry_entry.get("field_types", {})
+    file_cols    = set(registry_entry.get("file_facet_columns", []))
+    facet_pref   = registry_entry.get("facet", f"ioi-ext:{_to_facet_name(artifact_name)}")
+    facet_local  = facet_pref.split(":")[-1]  # e.g. MftFacet
+
+    int_cols  = set(field_types.get("integer", []))
+    dt_cols   = set(field_types.get("datetime", []))
+    bool_cols = set(field_types.get("boolean", []))
+    str_cols  = set(field_types.get("string", []))
+
+    def xsd_for(col):
+        if col in int_cols:  return "xsd:integer"
+        if col in dt_cols:   return "xsd:dateTime"
+        if col in bool_cols: return "xsd:boolean"
+        return "xsd:string"
+
+    with open(csv_path, "r", encoding="utf-8-sig") as f:
+        reader  = csv.DictReader(f)
+        headers = reader.fieldnames or []
+        rows    = list(reader)
+
+    # Columns not in field_types at all → become auto-generated ioi-ext properties
+    all_known = int_cols | dt_cols | bool_cols | str_cols | file_cols
+    truly_unmapped = [h for h in headers if h not in all_known and h not in column_mapping]
+
+    art_lower = artifact_name.lower().replace(" ", "_")
+
+    # Optional provenance: one source node + N action nodes
+    source_uuid = str(uuid.uuid4())
+    source_node = None
+    if include_provenance:
+        source_node = {
+            "@id":  f"kb:source-file--{source_uuid}",
+            "@type": "observable:File",
+            "core:hasFacet": [{
+                "@id":   f"kb:source-file-facet--{source_uuid}",
+                "@type": "observable:FileFacet",
+                "observable:fileName": Path(csv_path).name,
+                "observable:filePath": str(csv_path),
+                "observable:extension": ".csv",
+            }],
+        }
+
+    entry_nodes  = []
+    action_nodes = []
+
+    for row in rows:
+        entry_uuid = str(uuid.uuid4())
+
+        # ── FileFacet ────────────────────────────────────────────
+        file_facet = {
+            "@id":   f"kb:{art_lower}-file-facet--{entry_uuid}",
+            "@type": "observable:FileFacet",
+        }
+        for col in file_cols:
+            val = row.get(col, "")
+            prop = column_mapping.get(col) or _FILE_FACET_PROP_MAP.get(col)
+            if prop and val:
+                xsd = xsd_for(col)
+                s   = _serialize(val, xsd, _shape(xsd))
+                if s is not None:
+                    file_facet[prop] = s
+
+        # ── Artifact Facet ───────────────────────────────────────
+        art_facet = {
+            "@id":   f"kb:{facet_local.lower()}--{entry_uuid}",
+            "@type": [facet_pref, "core:Facet"],
+        }
+        for col, val in row.items():
+            if col in file_cols:
+                continue
+            # Explicit mapping overrides
+            if col in column_mapping:
+                prop = column_mapping[col]
+            else:
+                prop_local = _to_property_name(artifact_name, col.replace(" ", ""))
+                prop = f"{IOI_EXT_PREFIX}:{prop_local}"
+            xsd = xsd_for(col)
+            s   = _serialize(str(val), xsd, _shape(xsd))
+            if s is not None:
+                art_facet[prop] = s
+
+        facets = [f for f in [file_facet, art_facet] if len(f) > 2]
+
+        entry = {
+            "@id":          f"kb:{art_lower}--{entry_uuid}",
+            "@type":        "observable:File",
+            "core:hasFacet": facets,
+        }
+        entry_nodes.append(entry)
+
+        if include_provenance and source_node:
+            action_uuid = str(uuid.uuid4())
+            action_nodes.append({
+                "@id":   f"kb:action--{action_uuid}",
+                "@type": "uco-action:InvestigativeAction",
+                "core:source": {"@id": source_node["@id"]},
+                "core:target": {"@id": entry["@id"]},
+            })
+
+    all_nodes = []
+    if source_node:
+        all_nodes.append(source_node)
+    all_nodes.extend(entry_nodes)
+    all_nodes.extend(action_nodes)
+
+    return all_nodes, truly_unmapped
+
+
+# ─── Main generation function ─────────────────────────────────────────────────
 
 def generate_all_rows(
     ontology: OntologyLoader,
@@ -109,490 +235,221 @@ def generate_all_rows(
     csv_path: str,
     column_mapping: dict[str, str],
     description: Optional[str] = None,
+    registry_entry: Optional[dict] = None,
+    include_provenance: bool = True,
 ) -> dict:
     """
-    Generate a complete JSON-LD @graph with one ObservableObject per CSV row.
+    Generate a complete CASE/UCO JSON-LD @graph from all rows in a CSV.
+
+    If registry_entry is provided (from ManifestRegistry.resolve()),
+    uses the canonical field_types directly — no ontology search.
+    Otherwise falls back to the ontology derivation path.
 
     Args:
-        ontology: loaded ontology
-        artifact_name: e.g., 'Prefetch', 'SRUM'
+        ontology: loaded OntologyLoader
+        artifact_name: e.g. "MFT", "Prefetch"
         csv_path: path to CSV file
-        column_mapping: {csv_column: "uco-observable:propertyName"}
-            Columns not in mapping become ioi-ext: extension properties.
-        description: optional artifact description
+        column_mapping: {csv_column: prefixed_property} — explicit overrides
+        description: optional human description
+        registry_entry: dict from ManifestRegistry.resolve() (optional)
+        include_provenance: emit source-file + action nodes (default True for registry path)
 
-    Returns:
-        {
-            "jsonld": {...},           # Complete JSON-LD with all rows
-            "jsonld_path": "...",      # Where it was saved
-            "turtle_patch": "...",     # Turtle string (if extensions)
-            "turtle_path": "...",      # Where Turtle was saved
-            "row_count": N,            # Number of rows generated
-            "mapped_columns": [...],
-            "unmapped_columns": [...],
-        }
+    Returns dict with jsonld, jsonld_path, turtle_patch, turtle_path,
+    row_count, mapped_columns, unmapped_columns, flow_state.
     """
-    # Resolve artifact (ontology-only, no manifest)
-    name_candidates = [artifact_name, f"Windows{artifact_name}", artifact_name.replace(" ", "")]
 
+    # ── Registry fast path ───────────────────────────────────────────────────
+    if registry_entry:
+        graph_nodes, unmapped_headers = _generate_registry_path(
+            artifact_name, csv_path, column_mapping,
+            registry_entry, include_provenance,
+        )
+        columns = analyze_csv(csv_path)
+        unmapped_cols = [c for c in columns if c["column_name"] in unmapped_headers]
+
+        turtle_patch = None
+        if unmapped_cols:
+            turtle_patch = generate_turtle_patch(artifact_name, unmapped_cols, description)
+
+        jsonld = {"@context": dict(BASE_CONTEXT), "@graph": graph_nodes}
+        output_dir  = Path(csv_path).parent
+        jsonld_path = output_dir / f"{artifact_name.lower()}_full_graph.jsonld"
+        turtle_path = None
+
+        with open(jsonld_path, "w") as f:
+            json.dump(jsonld, f, indent=2, ensure_ascii=False)
+
+        if turtle_patch:
+            turtle_path = output_dir / f"{artifact_name.lower()}_ext.ttl"
+            with open(turtle_path, "w") as f:
+                f.write(turtle_patch)
+
+        # Entry count = total nodes minus source (1) and action nodes (N)
+        entry_count = sum(
+            1 for n in graph_nodes
+            if n.get("@id", "").startswith(f"kb:{artifact_name.lower()}--")
+        )
+
+        return {
+            "jsonld":           jsonld,
+            "jsonld_path":      str(jsonld_path),
+            "turtle_patch":     turtle_patch,
+            "turtle_path":      str(turtle_path) if turtle_path else None,
+            "row_count":        entry_count,
+            "mapped_columns":   list(column_mapping.keys()),
+            "unmapped_columns": [c["column_name"] for c in unmapped_cols],
+            "provenance":       include_provenance,
+            "flow_state": {
+                "step_completed": "generate_all_rows",
+                "path": "known_artifact",
+                "next": {
+                    "primary": f"validate_graph('{jsonld_path}') — must pass before proceeding",
+                    "if_invalid": "fix column_mapping, re-run generate_all_rows",
+                },
+                "invariant": "validate_graph must pass before scaffold_case or draft_sparql_context",
+            },
+        }
+
+    # ── Ontology fallback path (unknown artifacts) ───────────────────────────
+    # Resolve artifact class
     obs_class = None
-    for c in name_candidates:
+    for c in [artifact_name, f"Windows{artifact_name}", artifact_name.replace(" ", "")]:
         if ontology.observable_exists(c):
             uri = ontology.get_observable_uri(c)
-            obs_name = uri.split("/")[-1] if uri else c
-            obs_class = f"observable:{obs_name}"
+            obs_class = f"observable:{uri.split('/')[-1]}" if uri else f"observable:{c}"
             break
-
-    # Keyword search fallback for observable class
     if not obs_class:
-        _wiki = ontology.get_artifact_description(artifact_name)
-        _desc = ""
-        if isinstance(_wiki, dict):
-            _desc = _wiki.get("description", "")
-        elif isinstance(_wiki, str):
-            _desc = _wiki
-        search_results = ontology.search_candidates(
-            artifact_name, description=_desc, threshold=40
-        )
-        for sr in search_results:
+        wiki = ontology.get_artifact_description(artifact_name)
+        desc = wiki.get("description", "") if isinstance(wiki, dict) else (wiki or "")
+        for sr in ontology.search_candidates(artifact_name, description=desc, threshold=40):
             if sr["type"] == "observable":
                 obs_class = f"observable:{sr['class']}"
                 break
-
     if not obs_class:
-        # Default to observable:File for most forensic artifacts
-        # (MFT, LNK, EVTX, Prefetch, USN, etc. are all file-based)
-        # Matches IOI Framework convention where observable:File is standard
         obs_class = "observable:File"
 
-    # Analyze CSV for column types
-    columns = analyze_csv(csv_path)
-    col_types = {c["column_name"]: c["inferred_type"] for c in columns}
-
-    # Build property info for mapped columns
-    # {csv_column: {prefixed_prop, xsd_type, shape_hint, facet}}
-    mapped_props = {}
-    for csv_col, uco_prop in column_mapping.items():
-        # Determine type from SHACL
-        local_name = uco_prop.split(":")[-1] if ":" in uco_prop else uco_prop
-        xsd_type = col_types.get(csv_col, "xsd:string")
-        shape_hint = _shape_from_type(xsd_type)
-
-        # Check SHACL for official type override
-        if uco_prop.startswith("observable:") or uco_prop.startswith("core:") or uco_prop.startswith("uco-observable:") or uco_prop.startswith("uco-core:"):
-            shacl_type = _get_shacl_type(ontology, local_name)
-            if shacl_type:
-                xsd_type = shacl_type
-                shape_hint = _shape_from_type(xsd_type)
-
-        mapped_props[csv_col] = {
-            "prefixed": uco_prop,
-            "xsd_type": xsd_type,
-            "shape_hint": shape_hint,
-        }
-
-    # Build unmapped column info (become ioi-ext)
+    columns    = analyze_csv(csv_path)
+    col_types  = {c["column_name"]: c["inferred_type"] for c in columns}
     mapped_set = set(column_mapping.keys())
     unmapped_cols = [c for c in columns if c["column_name"] not in mapped_set]
 
-    unmapped_props = {}
-    for col in unmapped_cols:
-        prop_name = _to_property_name(artifact_name, col["clean_name"])
-        unmapped_props[col["column_name"]] = {
-            "prefixed": f"{IOI_EXT_PREFIX}:{prop_name}",
-            "xsd_type": col["inferred_type"],
-            "shape_hint": _shape_from_type(col["inferred_type"]),
-        }
-
-    # Resolve wiki description once for reuse
-    wiki_desc = ontology.get_artifact_description(artifact_name)
-    desc_text = ""
-    if isinstance(wiki_desc, dict):
-        desc_text = wiki_desc.get("description", "")
-    elif isinstance(wiki_desc, str):
-        desc_text = wiki_desc
-
-    # Determine facets from ontology (no manifest)
-    official_facets = []
-    # Step 1: Check for matching facet by exact name convention
-    for fc in [f"{artifact_name}Facet", f"Windows{artifact_name}Facet"]:
-        if ontology.facet_exists(fc):
-            uri = ontology.get_facet_uri(fc)
-            official_facets.append(uri.split("/")[-1] if uri else fc)
-            break
-    # Step 2: If no exact match, use keyword search to find facets
-    #   e.g. "MFT" -> finds MftRecordFacet via tokenized search
-    if not official_facets:
-        candidates = ontology.search_candidates(
-            artifact_name, description=desc_text, threshold=25
-        )
-        for cand in candidates:
-            if cand["type"] == "facet":
-                facet_local = cand["class"]
-                if ontology.facet_exists(facet_local):
-                    official_facets.append(facet_local)
-                    break
-            elif cand.get("facets"):
-                for f_info in cand["facets"]:
-                    if f_info["property_count"] > 0:
-                        official_facets.append(f_info["facet"])
-                break  # Use first observable candidate's facets
-    # Step 3: Semantic facet search — find relevant facets via property
-    # description keyword matching. These go to available_official_facets
-    # (informational for LLM) rather than auto-matching, because SHACL
-    # datatype constraints require careful type-aware mapping.
-    semantic_facets_found = []
-    if desc_text:
-        sem_facets = ontology.find_relevant_facets(
-            artifact_name, description=desc_text, top_n=3
-        )
-        for sf in sem_facets:
-            if sf["score"] >= 3 and sf["facet"] not in official_facets:
-                if sf["facet"] not in ("FileFacet", "ContentDataFacet"):
-                    semantic_facets_found.append(sf)
-    # Also check ioi-ext facets
-    ext_facet_key = _to_facet_name(artifact_name).replace("Facet", "") + "Facet"
-    if ontology.get_ext_facet_properties(ext_facet_key):
-        pass  # Extension properties will be handled via column mapping
-    # Always include FileFacet and ContentDataFacet (deduplicate)
-    for default_f in ["FileFacet", "ContentDataFacet"]:
-        if default_f not in official_facets:
-            official_facets.append(default_f)
-
-    # Pre-compute auto-match: for discovered official facets, match CSV
-    # columns to SHACL properties by exact name match (case-insensitive).
-    # Skips object properties (they need nested nodes, not flat CSV strings).
-    # Matched columns are removed from unmapped_props so they go to the
-    # official facet instead of ioi-ext.
-    official_auto_match = {}  # {facet_name: {csv_col: {prop_name, xsd_type, shape_hint}}}
-    for facet_name in official_facets:
-        facet_props = ontology.get_facet_properties(facet_name)
-        if not facet_props:
-            continue
-        auto = {}
-        for prop in facet_props:
-            if prop.get("range_type") == "object":
-                continue  # Skip hash, alternateDataStreams — need nested nodes
-            prop_local = prop["local_name"]
-            # Gate 1: Verify the property IRI exists in ontology
-            prop_iri_valid, _ = ontology.validate_type_iri(prop["name"])
-            if not prop_iri_valid:
-                continue
-            shacl_range = str(prop.get("range", "")).lower()
-            for csv_col in list(unmapped_props.keys()):
-                col_clean = csv_col.replace(" ", "").lower()
-                if prop_local.lower() == col_clean:
-                    csv_type = col_types.get(csv_col, "xsd:string")
-                    # Gate 2: Datatype compatibility check
-                    # SHACL range must be compatible with CSV inferred type
-                    compatible = _dtype_compatible(csv_type, shacl_range)
-                    if not compatible:
-                        break  # Name matches but type doesn't — skip
-                    # Use SHACL type if available, else CSV inferred
-                    xsd_type = f"xsd:{shacl_range}" if shacl_range and shacl_range in (
-                        "string", "integer", "boolean", "datetime", "decimal",
-                        "date", "float", "double", "hexbinary",
-                    ) else csv_type
-                    auto[csv_col] = {
-                        "prop_name": prop["name"],
-                        "xsd_type": xsd_type,
-                        "shape_hint": _shape_from_type(xsd_type),
-                    }
-                    del unmapped_props[csv_col]
-                    break
-        if auto:
-            official_auto_match[facet_name] = auto
-
-    # Auto-match curated ioi-ext.ttl properties by column name
-    # e.g. CSV "EntryNumber" → ioi-ext:entryNumber (from MftFacet in ioi-ext.ttl)
-    ext_auto_match = {}  # {csv_col: {prop_name, xsd_type, shape_hint}}
-    # Try multiple casing patterns: MFT→MftFacet, MFTFacet, WindowsMftFacet
-    art_title = artifact_name.capitalize()  # MFT → Mft, LNK → Lnk
-    for candidate_facet in [
-        f"{art_title}Facet",
-        f"Windows{art_title}Facet",
-        f"{artifact_name}Facet",
-        f"Windows{artifact_name}Facet",
-        _to_facet_name(artifact_name),
-    ]:
-        ext_props = ontology.get_ext_facet_properties(candidate_facet)
-        if not ext_props:
-            continue
-        for ep in ext_props:
-            ep_local = ep["name"].split(":")[-1]
-            for csv_col in list(unmapped_props.keys()):
-                col_clean = csv_col.replace(" ", "").lower()
-                if ep_local.lower() == col_clean:
-                    xsd_type = ep.get("range", "string")
-                    if not xsd_type.startswith("xsd:"):
-                        xsd_type = f"xsd:{xsd_type}"
-                    ext_auto_match[csv_col] = {
-                        "prop_name": ep["name"],
-                        "xsd_type": xsd_type,
-                        "shape_hint": _shape_from_type(xsd_type),
-                    }
-                    del unmapped_props[csv_col]
-                    break
-        break  # Use first matching facet
-
-    # Layer 0: Use curated ioi-ext.ttl facet name if it exists
-    # e.g. MFT → MftFacet (from ioi-ext.ttl), LNK → WindowsLnkFacet
+    art_title = artifact_name.capitalize()
     ext_facet_name = None
-    for candidate in [
-        f"{art_title}Facet",
-        f"Windows{art_title}Facet",
-        f"{artifact_name}Facet",
-        f"Windows{artifact_name}Facet",
-        _to_facet_name(artifact_name),
-    ]:
+    for candidate in [f"{art_title}Facet", f"Windows{art_title}Facet",
+                      f"{artifact_name}Facet", _to_facet_name(artifact_name)]:
         if ontology.get_ext_facet_properties(candidate):
             ext_facet_name = candidate
             break
     if not ext_facet_name:
         ext_facet_name = _to_facet_name(artifact_name)
 
-    # Read all CSV rows and generate graph
-    context = dict(BASE_CONTEXT)
-    graph_nodes = []
+    unmapped_props = {}
+    for col in unmapped_cols:
+        prop_name = _to_property_name(artifact_name, col["clean_name"])
+        unmapped_props[col["column_name"]] = {
+            "prefixed":   f"{IOI_EXT_PREFIX}:{prop_name}",
+            "xsd_type":   col["inferred_type"],
+            "shape_hint": _shape(col["inferred_type"]),
+        }
 
-    entity_local = obs_class.split(":")[-1].lower() if ":" in obs_class else artifact_name.lower()
+    mapped_props = {}
+    for csv_col, uco_prop in column_mapping.items():
+        xsd_type   = col_types.get(csv_col, "xsd:string")
+        shape_hint = _shape(xsd_type)
+        mapped_props[csv_col] = {
+            "prefixed": uco_prop, "xsd_type": xsd_type, "shape_hint": shape_hint,
+        }
+
+    graph_nodes = []
+    entity_local = obs_class.split(":")[-1].lower()
 
     with open(csv_path, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
-        for row_idx, row in enumerate(reader):
+        for row in reader:
             row_uuid = str(uuid.uuid4())
 
-            # Build official facets
-            facets = []
+            ext_facet = {
+                "@id":   f"kb:{ext_facet_name.lower()}--{row_uuid}",
+                "@type": [f"{IOI_EXT_PREFIX}:{ext_facet_name}", "core:Facet"],
+            }
+            for csv_col, prop_info in unmapped_props.items():
+                val = row.get(csv_col, "")
+                s   = _serialize(val, prop_info["xsd_type"], prop_info["shape_hint"])
+                if s is not None:
+                    ext_facet[prop_info["prefixed"]] = s
 
-            # Extension facet (curated ioi-ext.ttl props + unmapped columns)
-            if unmapped_props or ext_auto_match:
-                ext_facet = {
-                    "@id": f"kb:{ext_facet_name.lower()}--{row_uuid}",
-                    "@type": [f"{IOI_EXT_PREFIX}:{ext_facet_name}", "core:Facet"],
-                }
-                # Curated ioi-ext.ttl properties first
-                for csv_col, match_info in ext_auto_match.items():
-                    val = row.get(csv_col, "")
-                    serialized = _serialize_value(val, match_info["xsd_type"], match_info["shape_hint"])
-                    if serialized is not None:
-                        ext_facet[match_info["prop_name"]] = serialized
-                # Remaining unmapped columns as auto-generated properties
-                for csv_col, prop_info in unmapped_props.items():
-                    val = row.get(csv_col, "")
-                    serialized = _serialize_value(val, prop_info["xsd_type"], prop_info["shape_hint"])
-                    if serialized is not None:
-                        ext_facet[prop_info["prefixed"]] = serialized
-                facets.append(ext_facet)
+            facets = [ext_facet] if len(ext_facet) > 2 else []
 
-            # Official facets with mapped properties
-            for facet_name in official_facets:
-                facet_props = ontology.get_facet_properties(facet_name)
-                if not facet_props:
-                    continue
+            for csv_col, prop_info in mapped_props.items():
+                val = row.get(csv_col, "")
+                s   = _serialize(val, prop_info["xsd_type"], prop_info["shape_hint"])
+                if s is not None:
+                    if not facets:
+                        facets.append({"@id": f"kb:facet--{row_uuid}", "@type": "core:Facet"})
+                    facets[-1][prop_info["prefixed"]] = s
 
-                facet_type = f"observable:{facet_name}"
-                facet_node = {
-                    "@id": f"kb:{facet_name.lower()}--{row_uuid}",
-                    "@type": [facet_type, "core:Facet"],
-                }
-
-                for prop in facet_props:
-                    # Check if any explicitly mapped column targets this property
-                    for csv_col, prop_info in mapped_props.items():
-                        if prop_info["prefixed"] == prop["name"]:
-                            val = row.get(csv_col, "")
-                            serialized = _serialize_value(
-                                val, prop_info["xsd_type"], prop_info["shape_hint"]
-                            )
-                            if serialized is not None:
-                                facet_node[prop["name"]] = serialized
-                            break
-
-                # Add auto-matched columns
-                auto = official_auto_match.get(facet_name, {})
-                for csv_col, match_info in auto.items():
-                    val = row.get(csv_col, "")
-                    serialized = _serialize_value(
-                        val, match_info["xsd_type"], match_info["shape_hint"]
-                    )
-                    if serialized is not None:
-                        facet_node[match_info["prop_name"]] = serialized
-
-                # Only add facet if it has at least one property beyond @id/@type
-                if len(facet_node) > 2:
-                    facets.append(facet_node)
-
-            # Build the observable object node
-            obs_node = {
-                "@id": f"kb:{entity_local}--{row_uuid}",
-                "@type": obs_class,
+            obs = {
+                "@id":          f"kb:{entity_local}--{row_uuid}",
+                "@type":        obs_class,
                 "core:hasFacet": facets,
             }
-            graph_nodes.append(obs_node)
+            graph_nodes.append(obs)
 
-    # Also include ioi-ext properties from existing ioi-ext.ttl
-    ext_facet_key = ext_facet_name.replace("Facet", "") + "Facet"
-    existing_ext_props = ontology.get_ext_facet_properties(ext_facet_key)
-    # (These are already covered if the column names match — no duplication needed)
+    turtle_patch = generate_turtle_patch(artifact_name, unmapped_cols, description) if unmapped_cols else None
+    jsonld       = {"@context": dict(BASE_CONTEXT), "@graph": graph_nodes}
+    output_dir   = Path(csv_path).parent
+    jsonld_path  = output_dir / f"{artifact_name.lower()}_full_graph.jsonld"
+    turtle_path  = None
 
-    jsonld = {
-        "@context": context,
-        "@graph": graph_nodes,
-    }
-
-    # Generate Turtle patch for extension properties
-    turtle_patch = None
-    if unmapped_cols:
-        turtle_patch = generate_turtle_patch(artifact_name, unmapped_cols, description)
-
-    # Save files
-    output_dir = Path(csv_path).parent
-    jsonld_path = output_dir / f"{artifact_name.lower()}_full_graph.jsonld"
     with open(jsonld_path, "w") as f:
         json.dump(jsonld, f, indent=2, ensure_ascii=False)
-
-    turtle_path = None
     if turtle_patch:
         turtle_path = output_dir / f"{artifact_name.lower()}_ext.ttl"
         with open(turtle_path, "w") as f:
             f.write(turtle_patch)
 
-    # Build hint for official facets that were discovered but couldn't
-    # auto-match. Return their properties so the LLM can re-call with
-    # an explicit column_mapping to use them.
-    available_official_facets = {}
-    for facet_name in official_facets:
-        # Only include facets that weren't auto-matched (no columns went to them)
-        if facet_name in official_auto_match:
-            continue
-        facet_props = ontology.get_facet_properties(facet_name)
-        if not facet_props:
-            continue
-        # Skip object-only facets
-        datatype_props = [
-            {
-                "property": p["name"],
-                "local_name": p["local_name"],
-                "description": p.get("description", "")[:100],
-                "type": p["range"],
-            }
-            for p in facet_props
-            if p.get("range_type") != "object"
-        ]
-        if datatype_props:
-            available_official_facets[facet_name] = datatype_props
-
-    result = {
-        "jsonld": jsonld,
-        "jsonld_path": str(jsonld_path),
-        "turtle_patch": turtle_patch,
-        "turtle_path": str(turtle_path) if turtle_path else None,
-        "row_count": len(graph_nodes),
-        "mapped_columns": list(column_mapping.keys()),
+    return {
+        "jsonld":           jsonld,
+        "jsonld_path":      str(jsonld_path),
+        "turtle_patch":     turtle_patch,
+        "turtle_path":      str(turtle_path) if turtle_path else None,
+        "row_count":        len(graph_nodes),
+        "mapped_columns":   list(column_mapping.keys()),
         "unmapped_columns": [c["column_name"] for c in unmapped_cols],
+        "provenance":       False,
+        "flow_state": {
+            "step_completed": "generate_all_rows",
+            "path": "new_artifact",
+            "next": {
+                "primary": f"validate_graph('{jsonld_path}')",
+                "recommended": "generate_instantiator to register this artifact for future sessions",
+            },
+        },
     }
 
-    if available_official_facets:
-        result["available_official_facets"] = available_official_facets
-        result["mapping_hint"] = (
-            "Official CASE/UCO facets were found but could not auto-match "
-            "column names. Review the properties below and re-call with a "
-            "column_mapping to use official properties instead of ioi-ext. "
-            "Example: {'EntryNumber': 'observable:mftFileID'}"
-        )
 
-    # Add semantically discovered facets (from property description matching)
-    if semantic_facets_found:
-        result["semantic_facet_matches"] = semantic_facets_found
-        result["semantic_hint"] = (
-            "Additional CASE/UCO facets found by matching artifact description "
-            "against property descriptions. Review and include relevant properties "
-            "in column_mapping to use them."
-        )
-
-    return result
-
+# ── Private helpers for the ontology fallback path ────────────────────────────
 
 def _dtype_compatible(csv_type: str, shacl_range: str) -> bool:
-    """Check if a CSV inferred type is compatible with a SHACL range.
-    
-    Follows gate logic from case_uco.py: string is compatible with string,
-    integer with integer/nonNegativeInteger, dateTime with dateTime, etc.
-    String columns are compatible with string SHACL ranges.
-    Integer columns are NOT compatible with dateTime ranges.
-    """
-    csv_t = csv_type.lower().replace("xsd:", "")
-    shacl_t = shacl_range.lower().replace("xsd:", "")
-    
-    if not shacl_t or shacl_t in ("", "none"):
-        return True  # No SHACL constraint = anything goes
-    
-    # Exact match
-    if csv_t == shacl_t:
-        return True
-    
-    # String CSV values can match string SHACL properties
-    if csv_t == "string" and shacl_t == "string":
-        return True
-    
-    # Integer CSV compatible with integer/nonNegativeInteger
-    if csv_t == "integer" and shacl_t in ("integer", "nonnegativeinteger", "int", "long"):
-        return True
-    
-    # DateTime CSV compatible with dateTime
-    if csv_t == "datetime" and shacl_t in ("datetime", "date"):
-        return True
-    
-    # Boolean
-    if csv_t == "boolean" and shacl_t == "boolean":
-        return True
-    
-    # String CSV can coerce to string SHACL (most permissive)
-    if shacl_t == "string":
-        return True
-    
-    # Integer→string is acceptable (will be serialized as string)
-    if csv_t == "integer" and shacl_t == "string":
-        return True
-    
-    # Everything else is incompatible
+    csv_t    = csv_type.lower().replace("xsd:", "")
+    shacl_t  = shacl_range.lower().replace("xsd:", "")
+    if not shacl_t: return True
+    if csv_t == shacl_t: return True
+    if csv_t == "integer" and shacl_t in ("integer","nonnegativeinteger","int","long"): return True
+    if csv_t == "datetime" and shacl_t in ("datetime","date"): return True
+    if csv_t == "boolean"  and shacl_t == "boolean": return True
+    if shacl_t == "string": return True
     return False
 
 
-def _shape_from_type(xsd_type: str) -> str:
-    """Derive shape hint from xsd type."""
-    if "integer" in xsd_type:
-        return "integer_literal"
-    elif "dateTime" in xsd_type or "date" in xsd_type:
-        return "datetime_literal"
-    elif "decimal" in xsd_type or "float" in xsd_type:
-        return "number_literal"
-    elif "boolean" in xsd_type:
-        return "boolean_literal"
-    elif "hexBinary" in xsd_type:
-        return "hex_literal"
-    return "string"
-
-
 def _get_shacl_type(ontology: OntologyLoader, local_name: str) -> Optional[str]:
-    """Try to find the SHACL-defined type for a property across all facets."""
-    # Search common facets for this property
-    for facet_name in ["FileFacet", "ContentDataFacet", "WindowsPrefetchFacet",
-                       "EventRecordFacet", "ProcessFacet", "NetworkConnectionFacet",
-                       "URLHistoryFacet", "UserAccountFacet", "DeviceFacet",
-                       "DiskFacet", "MemoryFacet", "MftRecordFacet"]:
+    for facet_name in ["FileFacet","ContentDataFacet","WindowsPrefetchFacet",
+                       "EventRecordFacet","ProcessFacet","NetworkConnectionFacet"]:
         for prop in ontology.get_facet_properties(facet_name):
             if prop["local_name"] == local_name:
                 r = prop["range"]
-                if r in ("integer", "int"):
-                    return "xsd:integer"
-                elif r == "dateTime":
-                    return "xsd:dateTime"
-                elif r == "boolean":
-                    return "xsd:boolean"
-                elif r == "decimal":
-                    return "xsd:decimal"
-                elif r == "string":
-                    return "xsd:string"
+                mapping = {"integer":"xsd:integer","int":"xsd:integer",
+                           "dateTime":"xsd:dateTime","boolean":"xsd:boolean",
+                           "decimal":"xsd:decimal","string":"xsd:string"}
+                return mapping.get(r)
     return None
