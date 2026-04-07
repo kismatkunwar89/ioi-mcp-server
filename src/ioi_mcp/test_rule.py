@@ -56,6 +56,23 @@ def test_rule(
             "or simple != comparison."
         )
 
+    # Detect cross-graph anti-join pattern (known rdflib limitation)
+    import re as _re
+    _has_graph = bool(_re.search(r"GRAPH\s*<", rule_text, _re.IGNORECASE))
+    _has_antijoin = bool(_re.search(
+        r"(FILTER\s+NOT\s+EXISTS|MINUS)\s*\{", rule_text, _re.IGNORECASE))
+    if _has_graph and _has_antijoin:
+        warnings.append(
+            "Rule uses cross-graph anti-join (FILTER NOT EXISTS or MINUS with GRAPH clauses). "
+            "rdflib has known limitations with cross-graph variable correlation in these patterns — "
+            "the rule may return incorrect results even if the SPARQL logic is correct. "
+            "Two options: (1) Rewrite without GRAPH clauses (default-graph form) — works in "
+            "playground and rdflib. (2) Use a two-step approach: query MFT filenames first, "
+            "inject via VALUES, then filter. The default-graph form is equivalent because "
+            "the playground merges all loaded files into the default graph. "
+            "On Virtuoso, the named-graph GRAPH clause version works correctly."
+        )
+
     # Create Dataset and load graphs
     ds = Dataset()
     graphs_loaded = []
