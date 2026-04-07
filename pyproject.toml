@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ioi-mcp-server"
-version = "0.1.0"
+version = "0.2.0"
 description = "IOI Framework MCP Server — scalable CASE/UCO artifact graph generator for digital forensics"
 requires-python = ">=3.10"
 dependencies = [
