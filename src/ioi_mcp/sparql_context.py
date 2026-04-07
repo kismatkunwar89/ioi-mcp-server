@@ -31,7 +31,7 @@ def extract_sparql_context(
         graphs: list of {
             "name": "MFT",
             "graph_path": "/path/to/mft_full_graph.jsonld",
-            "graph_iri": "http://example.org/mft_caseN"  (optional, auto-generated if missing)
+            "graph_iri": "https://ioi-framework.github.io/cases/AF-NEW/graphs/mft"  (optional, auto-generated if missing)
         }
         contradiction_description: what the rule should detect
         category: "temporal", "structural", or "semantic"
@@ -42,7 +42,7 @@ def extract_sparql_context(
             "graphs": [
                 {
                     "name": "MFT",
-                    "graph_iri": "http://example.org/mft_caseN",
+                    "graph_iri": "https://ioi-framework.github.io/cases/AF-NEW/graphs/mft",
                     "types_used": ["observable:File", "ioi-ext:MftFacet", ...],
                     "properties_used": [
                         {"property": "ioi-ext:entryNumber", "type": "xsd:integer", "sample": "12345"},
@@ -62,7 +62,7 @@ def extract_sparql_context(
     for g_info in graphs:
         name = g_info["name"]
         graph_path = g_info["graph_path"]
-        graph_iri = g_info.get("graph_iri", f"http://example.org/{name.lower()}_case")
+        graph_iri = g_info.get("graph_iri", f"https://ioi-framework.github.io/cases/AF-NEW/graphs/{name.lower()}")
 
         if not Path(graph_path).exists():
             continue
