@@ -1,0 +1,282 @@
+{
+  "schema_version": "1.0",
+  "kb_namespace": "https://ioi-framework.github.io/kb/",
+  "graph_iri_pattern": "https://ioi-framework.github.io/cases/{case_id}/graphs/{artifact_lower}",
+  "artifacts": {
+    "MFT": {
+      "artifact_id": "ART-001",
+      "full_name": "$MFT (Master File Table)",
+      "parser_tool": "MFTECmd",
+      "input_format": "CSV",
+      "facet": "ioi-ext:MftFacet",
+      "instantiator": "instantiators/mft_instantiator.py",
+      "template_dir": "instantiators/templates/mft/",
+      "status": "validated",
+      "cases": [
+        "AF-004",
+        "AF-011"
+      ],
+      "rules": [
+        "IOI-004",
+        "IOI-011"
+      ],
+      "file_facet_columns": [
+        "FileName",
+        "Extension",
+        "FileSize",
+        "IsDirectory",
+        "ReferenceCount",
+        "SecurityId"
+      ],
+      "field_types": {
+        "integer": [
+          "EntryNumber",
+          "SequenceNumber",
+          "ParentEntryNumber",
+          "ParentSequenceNumber",
+          "FileSize",
+          "ReferenceCount",
+          "UpdateSequenceNumber",
+          "LogfileSequenceNumber",
+          "uSecZeros"
+        ],
+        "datetime": [
+          "Created0x10",
+          "Created0x30",
+          "LastModified0x10",
+          "LastModified0x30",
+          "LastRecordChange0x10",
+          "LastRecordChange0x30",
+          "LastAccess0x10",
+          "LastAccess0x30"
+        ],
+        "boolean": [
+          "InUse",
+          "IsDirectory",
+          "HasAds",
+          "IsAds",
+          "SI<FN",
+          "Copied"
+        ],
+        "string": [
+          "FileName",
+          "Extension",
+          "ParentPath",
+          "SiFlags",
+          "NameType",
+          "ReparseTarget",
+          "SecurityId",
+          "ObjectIdFileDroid",
+          "LoggedUtilStream",
+          "ZoneIdContents",
+          "SourceFile"
+        ]
+      }
+    },
+    "USN": {
+      "artifact_id": "ART-002",
+      "full_name": "$UsnJrnl:$J (USN Change Journal)",
+      "parser_tool": "MFTECmd",
+      "input_format": "CSV",
+      "facet": "ioi-ext:UsnFacet",
+      "instantiator": "instantiators/usn_instantiator.py",
+      "template_dir": "instantiators/templates/usn/",
+      "status": "validated",
+      "cases": [
+        "AF-004",
+        "AF-007"
+      ],
+      "rules": [
+        "IOI-004",
+        "IOI-007"
+      ],
+      "file_facet_columns": [
+        "Name",
+        "Extension",
+        "ParentPath"
+      ],
+      "field_types": {
+        "integer": [
+          "EntryNumber",
+          "SequenceNumber",
+          "ParentEntryNumber",
+          "ParentSequenceNumber",
+          "UpdateSequenceNumber"
+        ],
+        "datetime": [
+          "UpdateTimestamp"
+        ],
+        "boolean": [],
+        "string": [
+          "Name",
+          "Extension",
+          "ParentPath",
+          "UpdateReasons",
+          "FileAttributes",
+          "SourceInfo"
+        ]
+      }
+    },
+    "LNK": {
+      "artifact_id": "ART-003",
+      "full_name": "Windows Shell Link (.lnk)",
+      "parser_tool": "LECmd",
+      "input_format": "CSV",
+      "facet": "ioi-ext:LnkFacet",
+      "instantiator": "instantiators/lnk_instantiator.py",
+      "template_dir": "instantiators/templates/lnk/",
+      "status": "validated",
+      "cases": [
+        "AF-011"
+      ],
+      "rules": [
+        "IOI-011"
+      ],
+      "file_facet_columns": [
+        "SourceFile",
+        "SourceCreated",
+        "SourceModified",
+        "SourceAccessed"
+      ],
+      "field_types": {
+        "integer": [
+          "TargetMFTEntryNumber",
+          "TargetMFTSequenceNumber"
+        ],
+        "datetime": [
+          "TargetCreated",
+          "TargetModified",
+          "TargetAccessed",
+          "SourceCreated",
+          "SourceModified",
+          "SourceAccessed"
+        ],
+        "boolean": [],
+        "string": [
+          "SourceFile",
+          "TargetFilePath",
+          "TargetFileName",
+          "RelativePath",
+          "WorkingDirectory",
+          "Arguments",
+          "MachineID",
+          "MachineMACAddress"
+        ]
+      }
+    },
+    "EVTX": {
+      "artifact_id": "ART-004",
+      "full_name": "Windows Event Log (.evtx)",
+      "parser_tool": "EvtxECmd",
+      "input_format": "CSV",
+      "facet": "ioi-ext:EventLogFacet",
+      "instantiator": "instantiators/evtx_instantiator.py",
+      "template_dir": "instantiators/templates/evtx/",
+      "status": "validated",
+      "cases": [
+        "AF-007"
+      ],
+      "rules": [
+        "IOI-007"
+      ],
+      "file_facet_columns": [],
+      "field_types": {
+        "integer": [
+          "EventId",
+          "ProcessId",
+          "ThreadId"
+        ],
+        "datetime": [
+          "TimeCreated"
+        ],
+        "boolean": [],
+        "string": [
+          "Channel",
+          "Computer",
+          "Provider",
+          "EventData",
+          "UserId",
+          "Level",
+          "Keywords"
+        ]
+      }
+    },
+    "BrowserHistory": {
+      "artifact_id": "ART-005",
+      "full_name": "Chrome / Browser History SQLite",
+      "parser_tool": "Hindsight",
+      "input_format": "JSON",
+      "facet": "ioi-ext:BrowserHistoryFacet",
+      "instantiator": "instantiators/history_instantiator.py",
+      "template_dir": "instantiators/templates/browser_history/",
+      "status": "validated",
+      "cases": [
+        "AF-002"
+      ],
+      "rules": [
+        "IOI-002"
+      ],
+      "file_facet_columns": [],
+      "field_types": {
+        "integer": [
+          "VisitCount",
+          "TypedCount"
+        ],
+        "datetime": [
+          "LastVisitTime",
+          "VisitTime"
+        ],
+        "boolean": [
+          "Hidden"
+        ],
+        "string": [
+          "URL",
+          "Title",
+          "Domain",
+          "TransitionType",
+          "VisitSource"
+        ]
+      }
+    },
+    "OfficeXML": {
+      "artifact_id": "ART-006",
+      "full_name": "Office Open XML Core Properties (docx/xlsx/pptx)",
+      "parser_tool": "python-docx / manual",
+      "input_format": "JSON",
+      "facet": "ioi-ext:OfficeXMLFacet",
+      "instantiator": "instantiators/office_xml_instantiator.py",
+      "template_dir": "instantiators/templates/office_xml/",
+      "status": "validated",
+      "cases": [
+        "AF-012"
+      ],
+      "rules": [
+        "IOI-012"
+      ],
+      "file_facet_columns": [
+        "FileName",
+        "FilePath"
+      ],
+      "field_types": {
+        "integer": [],
+        "datetime": [
+          "Created",
+          "Modified",
+          "LastPrinted"
+        ],
+        "boolean": [],
+        "string": [
+          "FileName",
+          "FilePath",
+          "Author",
+          "LastModifiedBy",
+          "Title",
+          "Subject",
+          "Description",
+          "Keywords",
+          "Category"
+        ]
+      }
+    }
+  }
+}
