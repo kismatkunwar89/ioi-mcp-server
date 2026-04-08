@@ -59,18 +59,23 @@ def test_rule(
     # Detect cross-graph anti-join pattern (known rdflib limitation)
     import re as _re
     _has_graph = bool(_re.search(r"GRAPH\s*<", rule_text, _re.IGNORECASE))
-    _has_antijoin = bool(_re.search(
-        r"(FILTER\s+NOT\s+EXISTS|MINUS)\s*\{", rule_text, _re.IGNORECASE))
-    if _has_graph and _has_antijoin:
+    _has_antijoin_fenx = bool(_re.search(r"FILTER\s+NOT\s+EXISTS", rule_text, _re.IGNORECASE))
+    _has_minus = bool(_re.search(r"\bMINUS\b\s*\{", rule_text, _re.IGNORECASE))
+    if _has_graph and _has_antijoin_fenx:
         warnings.append(
-            "Rule uses cross-graph anti-join (FILTER NOT EXISTS or MINUS with GRAPH clauses). "
-            "rdflib has known limitations with cross-graph variable correlation in these patterns — "
-            "the rule may return incorrect results even if the SPARQL logic is correct. "
-            "Two options: (1) Rewrite without GRAPH clauses (default-graph form) — works in "
-            "playground and rdflib. (2) Use a two-step approach: query MFT filenames first, "
-            "inject via VALUES, then filter. The default-graph form is equivalent because "
-            "the playground merges all loaded files into the default graph. "
-            "On Virtuoso, the named-graph GRAPH clause version works correctly."
+            "Rule uses cross-graph FILTER NOT EXISTS with GRAPH clauses. "
+            "rdflib may return incorrect results for this pattern. "
+            "HOWEVER: oxigraph (playground) handles named-graph FILTER NOT EXISTS correctly. "
+            "Recommended: test in the playground first. "
+            "For rdflib local testing, use the two-step approach: "
+            "query graph A names first, inject via VALUES, then filter."
+        )
+    if _has_graph and _has_minus:
+        warnings.append(
+            "Rule uses MINUS subquery with GRAPH clauses. "
+            "MINUS subquery is unreliable in both rdflib and oxigraph for cross-graph patterns. "
+            "Replace with FILTER NOT EXISTS { GRAPH <IRI> { ... } } instead — "
+            "this is verified correct in oxigraph."
         )
 
     # Create Dataset and load graphs
