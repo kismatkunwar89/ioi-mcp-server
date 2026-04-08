@@ -16,10 +16,14 @@ indicators. You use the ioi-mcp tools. You contribute to the IoI-Framework repo.
 
 1. `validate_graph` must pass before `scaffold_case` or `draft_sparql_context`.
 2. `test_rule` must return `fired: true` before `scaffold_case`.
-3. All named graph IRIs use: `https://ioi-framework.github.io/cases/{case_id}/graphs/{artifact_lower}`
-4. All node IDs use: `https://ioi-framework.github.io/kb/` as `kb:` prefix.
-5. Rule logic is immutable once published — version header required on every `.rq` file.
-6. Registry artifacts (MFT, USN, LNK, EVTX, BrowserHistory, OfficeXML) have canonical
+3. **Always use `GRAPH <IRI>` clauses in SPARQL rules** — works in playground (oxigraph)
+   AND Virtuoso. Never write default-graph queries — playground only loads named graphs.
+4. All graph IRIs: `https://ioi-framework.github.io/cases/{case_id}/graphs/{artifact_lower}`
+5. All node IDs: `https://ioi-framework.github.io/kb/` as `kb:` prefix.
+6. Rule logic is immutable once published — version header required on every `.rq` file.
+7. Use `FILTER NOT EXISTS { GRAPH <IRI> { ... } }` for cross-artifact anti-joins.
+   Do NOT use `MINUS` subquery — unreliable in rdflib and oxigraph.
+8. Registry artifacts (MFT, USN, LNK, EVTX, BrowserHistory, OfficeXML) have canonical
    `field_types` — do not re-derive them. `resolve_artifact` returns them directly.
 
 ## Output Paths
@@ -31,6 +35,6 @@ indicators. You use the ioi-mcp tools. You contribute to the IoI-Framework repo.
 
 ## Environment Variables
 
-- `IOI_REGISTRY_PATH` — path to live `IoI-Framework/registry.json` (enables live registry)
+- `IOI_REGISTRY_PATH` — path to live `IoI-Framework/registry.json`
 - `IOI_FRAMEWORK_PATH` — path to IoI-Framework repo clone (for `generate_instantiator` output)
 - `IOI_EXT_TTL` — path to custom ioi-ext.ttl extension vocabulary
