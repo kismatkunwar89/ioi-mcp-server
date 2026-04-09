@@ -71,7 +71,20 @@
           "ZoneIdContents",
           "SourceFile"
         ]
-      }
+      },
+      "export_strategy": "binary_tool",
+      "file_patterns": [
+        "$MFT"
+      ],
+      "fallback_patterns": [],
+      "parent_path_filter": null,
+      "tool_key": "MFTECMD_PATH",
+      "tool_arg_mode": "single_file",
+      "tool_output_flag": "--csv",
+      "tool_output_ext": ".csv",
+      "tool_output_format": "csv",
+      "max_files": 0,
+      "cleanup_raw": true
     },
     "USN": {
       "artifact_id": "ART-002",
@@ -115,7 +128,23 @@
           "FileAttributes",
           "SourceInfo"
         ]
-      }
+      },
+      "export_strategy": "binary_tool",
+      "file_patterns": [
+        "$UsnJrnl:$J"
+      ],
+      "fallback_patterns": [
+        "$J",
+        "$UsnJrnl"
+      ],
+      "parent_path_filter": null,
+      "tool_key": "MFTECMD_PATH",
+      "tool_arg_mode": "single_file",
+      "tool_output_flag": "--csv",
+      "tool_output_ext": ".csv",
+      "tool_output_format": "csv",
+      "max_files": 0,
+      "cleanup_raw": true
     },
     "LNK": {
       "artifact_id": "ART-003",
@@ -162,7 +191,20 @@
           "MachineID",
           "MachineMACAddress"
         ]
-      }
+      },
+      "export_strategy": "directory_tool",
+      "file_patterns": [
+        "%.lnk"
+      ],
+      "fallback_patterns": [],
+      "parent_path_filter": "Recent",
+      "tool_key": "LECMD_PATH",
+      "tool_arg_mode": "directory",
+      "tool_output_flag": "--csv",
+      "tool_output_ext": ".csv",
+      "tool_output_format": "csv",
+      "max_files": 1000,
+      "cleanup_raw": false
     },
     "EVTX": {
       "artifact_id": "ART-004",
@@ -199,7 +241,20 @@
           "Level",
           "Keywords"
         ]
-      }
+      },
+      "export_strategy": "binary_tool",
+      "file_patterns": [
+        "Security.evtx"
+      ],
+      "fallback_patterns": [],
+      "parent_path_filter": null,
+      "tool_key": "EVTXECMD_PATH",
+      "tool_arg_mode": "single_file",
+      "tool_output_flag": "--json",
+      "tool_output_ext": ".jsonl",
+      "tool_output_format": "jsonl",
+      "max_files": 0,
+      "cleanup_raw": true
     },
     "BrowserHistory": {
       "artifact_id": "ART-005",
@@ -236,7 +291,20 @@
           "TransitionType",
           "VisitSource"
         ]
-      }
+      },
+      "export_strategy": "sqlite",
+      "file_patterns": [
+        "History"
+      ],
+      "fallback_patterns": [],
+      "parent_path_filter": "Chrome",
+      "tool_key": null,
+      "tool_arg_mode": null,
+      "tool_output_flag": null,
+      "tool_output_ext": ".json",
+      "tool_output_format": "json",
+      "max_files": 0,
+      "cleanup_raw": true
     },
     "OfficeXML": {
       "artifact_id": "ART-006",
@@ -276,7 +344,23 @@
           "Keywords",
           "Category"
         ]
-      }
+      },
+      "export_strategy": "zip_xml",
+      "file_patterns": [
+        "%.docx",
+        "%.xlsx",
+        "%.pptx"
+      ],
+      "fallback_patterns": [],
+      "parent_path_filter": null,
+      "tool_key": null,
+      "tool_arg_mode": null,
+      "tool_output_flag": null,
+      "tool_output_ext": "_core.xml",
+      "tool_output_format": "xml",
+      "zip_member": "docProps/core.xml",
+      "max_files": 0,
+      "cleanup_raw": true
     }
   }
 }
