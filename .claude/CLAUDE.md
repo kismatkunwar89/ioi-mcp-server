@@ -23,8 +23,9 @@ indicators. You use the ioi-mcp tools. You contribute to the IoI-Framework repo.
 6. Rule logic is immutable once published — version header required on every `.rq` file.
 7. Use `FILTER NOT EXISTS { GRAPH <IRI> { ... } }` for cross-artifact anti-joins.
    Do NOT use `MINUS` subquery — unreliable in rdflib and oxigraph.
-8. Registry artifacts (MFT, USN, LNK, EVTX, BrowserHistory, OfficeXML) have canonical
-   `field_types` — do not re-derive them. `resolve_artifact` returns them directly.
+8. Registry artifact keys are lowercase artifact_type identifiers:
+   `mft`, `usn`, `lnk`, `evtx`, `history`, `office_xml`.
+   Each has canonical `field_types` — do not re-derive them. `resolve_artifact` returns them directly.
 
 ## Output Paths
 

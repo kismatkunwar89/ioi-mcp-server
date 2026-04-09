@@ -15,7 +15,7 @@ from typing import Optional
 
 
 KB_NAMESPACE       = "https://ioi-framework.github.io/kb/"
-GRAPH_IRI_PATTERN  = "https://ioi-framework.github.io/cases/{case_id}/graphs/{artifact_lower}"
+GRAPH_IRI_PATTERN  = "https://ioi-framework.github.io/cases/{case_id}/graphs/{graph_segment}"
 
 
 def _find_registry_path() -> str:
@@ -89,13 +89,16 @@ class ManifestRegistry:
     def make_graph_iri(self, case_id: str, artifact_name: str) -> str:
         """
         Build a named graph IRI for a given case + artifact.
-        e.g. make_graph_iri("AF-004", "MFT")
-          → "https://ioi-framework.github.io/cases/AF-004/graphs/mft"
+        Graph segment is read from registry 'graph_segment' field so
+        artifact_type -> segment mappings (e.g. office_xml -> 'office')
+        are driven by the registry, not hardcoded here.
+
+        e.g. make_graph_iri("AF-004", "mft")        → .../graphs/mft
+             make_graph_iri("AF-012", "office_xml")  → .../graphs/office
         """
-        return GRAPH_IRI_PATTERN.format(
-            case_id=case_id,
-            artifact_lower=artifact_name.lower().replace(" ", "_"),
-        )
+        entry   = self.resolve(artifact_name)
+        segment = entry.get("graph_segment", artifact_name.lower()) if entry else artifact_name.lower()
+        return GRAPH_IRI_PATTERN.format(case_id=case_id, graph_segment=segment)
 
     @property
     def kb_namespace(self) -> str:

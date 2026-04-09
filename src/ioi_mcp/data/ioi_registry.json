@@ -1,9 +1,12 @@
 {
   "schema_version": "1.0",
   "kb_namespace": "https://ioi-framework.github.io/kb/",
-  "graph_iri_pattern": "https://ioi-framework.github.io/cases/{case_id}/graphs/{artifact_lower}",
+  "graph_iri_pattern": "https://ioi-framework.github.io/cases/{case_id}/graphs/{artifact_type}",
   "artifacts": {
-    "MFT": {
+    "mft": {
+      "artifact_type": "mft",
+      "graph_segment": "mft",
+      "graph_segment_aliases": [],
       "artifact_id": "ART-001",
       "full_name": "$MFT (Master File Table)",
       "parser_tool": "MFTECmd",
@@ -86,7 +89,10 @@
       "max_files": 0,
       "cleanup_raw": true
     },
-    "USN": {
+    "usn": {
+      "artifact_type": "usn",
+      "graph_segment": "usn",
+      "graph_segment_aliases": [],
       "artifact_id": "ART-002",
       "full_name": "$UsnJrnl:$J (USN Change Journal)",
       "parser_tool": "MFTECmd",
@@ -146,7 +152,10 @@
       "max_files": 0,
       "cleanup_raw": true
     },
-    "LNK": {
+    "lnk": {
+      "artifact_type": "lnk",
+      "graph_segment": "lnk",
+      "graph_segment_aliases": [],
       "artifact_id": "ART-003",
       "full_name": "Windows Shell Link (.lnk)",
       "parser_tool": "LECmd",
@@ -206,7 +215,12 @@
       "max_files": 1000,
       "cleanup_raw": false
     },
-    "EVTX": {
+    "evtx": {
+      "artifact_type": "evtx",
+      "graph_segment": "evtx",
+      "graph_segment_aliases": [
+        "security"
+      ],
       "artifact_id": "ART-004",
       "full_name": "Windows Event Log (.evtx)",
       "parser_tool": "EvtxECmd",
@@ -256,7 +270,10 @@
       "max_files": 0,
       "cleanup_raw": true
     },
-    "BrowserHistory": {
+    "history": {
+      "artifact_type": "history",
+      "graph_segment": "history",
+      "graph_segment_aliases": [],
       "artifact_id": "ART-005",
       "full_name": "Chrome / Browser History SQLite",
       "parser_tool": "Hindsight",
@@ -306,7 +323,10 @@
       "max_files": 0,
       "cleanup_raw": true
     },
-    "OfficeXML": {
+    "office_xml": {
+      "artifact_type": "office_xml",
+      "graph_segment": "office",
+      "graph_segment_aliases": [],
       "artifact_id": "ART-006",
       "full_name": "Office Open XML Core Properties (docx/xlsx/pptx)",
       "parser_tool": "python-docx / manual",
